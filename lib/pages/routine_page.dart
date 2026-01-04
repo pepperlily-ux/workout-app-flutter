@@ -1,4 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/routine.dart';
 import '../models/exercise.dart';
 import '../services/storage_service.dart';
@@ -22,7 +26,9 @@ class _RoutinePageState extends State<RoutinePage> {
     _loadData();
   }
 
-  void _loadData() {
+  Future<void> _loadData() async {
+    await _storage.init();
+    if (!mounted) return;
     setState(() {
       _routines = _storage.getRoutines();
       _exercises = _storage.getExercises();
@@ -147,42 +153,54 @@ class _RoutinePageState extends State<RoutinePage> {
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _exportData();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFA295D5),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                _exportData();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFA295D5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Text(
+                    '데이터 내보내기',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-                child: const Text('데이터 내보내기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _importData();
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF374151),
-                  side: const BorderSide(color: Color(0xFFD1D5DB)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                _importData();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                ),
+                child: const Center(
+                  child: Text(
+                    '데이터 불러오기',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF374151),
+                    ),
                   ),
                 ),
-                child: const Text('데이터 불러오기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
               ),
             ),
             const SizedBox(height: 16),
@@ -192,18 +210,109 @@ class _RoutinePageState extends State<RoutinePage> {
     );
   }
 
-  void _exportData() {
-    // TODO: 데이터 내보내기 구현
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('데이터 내보내기 기능은 준비 중입니다')),
-    );
+  // 데이터 내보내기 (JSON 파일로 공유)
+  Future<void> _exportData() async {
+    try {
+      // JSON 데이터 생성
+      final jsonData = _storage.exportAllData();
+
+      // 임시 파일 생성
+      final directory = await getTemporaryDirectory();
+      final timestamp = DateTime.now().toString().substring(0, 10);
+      final file = File('${directory.path}/metamong_backup_$timestamp.json');
+      await file.writeAsString(jsonData);
+
+      // 공유 시트 열기
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: '메타몽 과부하 백업',
+        text: '운동 기록 백업 파일',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('데이터를 내보냈습니다')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('내보내기 실패: $e')),
+        );
+      }
+    }
   }
 
-  void _importData() {
-    // TODO: 데이터 불러오기 구현
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('데이터 불러오기 기능은 준비 중입니다')),
-    );
+  // 데이터 가져오기 (JSON 파일 선택)
+  Future<void> _importData() async {
+    try {
+      // 파일 선택
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return; // 취소됨
+      }
+
+      final file = File(result.files.single.path!);
+      final jsonString = await file.readAsString();
+
+      // 확인 다이얼로그
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('데이터 가져오기'),
+          content: const Text(
+            '기존 데이터를 모두 덮어씁니다.\n계속하시겠습니까?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소', style: TextStyle(color: Color(0xFF6B7280))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('가져오기', style: TextStyle(color: Color(0xFFA295D5))),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      // 데이터 가져오기
+      final counts = await _storage.importAllData(jsonString);
+
+      // 데이터 새로고침
+      _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '가져오기 완료: 운동 ${counts['exercises']}개, '
+              '기록 ${counts['records']}개, 루틴 ${counts['routines']}개',
+            ),
+          ),
+        );
+      }
+    } on FormatException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('가져오기 실패: $e')),
+        );
+      }
+    }
   }
 
   Exercise? _getExerciseById(String id) {
@@ -224,22 +333,24 @@ class _RoutinePageState extends State<RoutinePage> {
             child: Column(
               children: [
                 // 새 루틴 만들기 버튼
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _showCreateRoutineModal,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFA295D5),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                GestureDetector(
+                  onTap: _showCreateRoutineModal,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA295D5),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      '+ 새 루틴 만들기',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    child: const Center(
+                      child: Text(
+                        '+ 새 루틴 만들기',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -300,7 +411,7 @@ class _RoutinePageState extends State<RoutinePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
-            'assets/routine.png',
+            'assets/home.png',
             width: 200,
             errorBuilder: (context, error, stackTrace) => const SizedBox(height: 100),
           ),
@@ -399,7 +510,7 @@ class _CreateRoutineModal extends StatefulWidget {
 class _CreateRoutineModalState extends State<_CreateRoutineModal> {
   final TextEditingController _nameController = TextEditingController();
   String _selectedTag = '전체';
-  List<String> _selectedExercises = [];
+  final List<String> _selectedExercises = [];
 
   List<String> get _tags {
     final tags = widget.exercises.map((e) => e.tag).toSet().toList();
@@ -648,24 +759,24 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: (_nameController.text.trim().isNotEmpty && _selectedExercises.isNotEmpty)
-                      ? const Color(0xFFA295D5)
-                      : const Color(0xFFD1D5DB),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+            child: GestureDetector(
+              onTap: _handleSave,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFA295D5),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  '루틴 저장',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                child: const Center(
+                  child: Text(
+                    '루틴 저장',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -959,22 +1070,24 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFA295D5),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+            child: GestureDetector(
+              onTap: _handleSave,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFA295D5),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  '저장',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                child: const Center(
+                  child: Text(
+                    '저장',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),

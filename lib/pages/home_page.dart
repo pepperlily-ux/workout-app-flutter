@@ -5,6 +5,7 @@ import '../models/record.dart';
 import '../models/routine.dart';
 import '../models/workout_set.dart';
 import '../services/storage_service.dart';
+import '../widgets/custom_keyboard.dart';
 
 // 홈 화면
 class HomePage extends StatefulWidget {
@@ -24,6 +25,13 @@ class _HomePageState extends State<HomePage> {
   List<Exercise> exercises = [];
   List<Routine> routines = [];
   Map<String, bool> checkedSets = {};
+
+  // 커스텀 키보드 상태
+  bool _isKeyboardVisible = false;
+  String? _activeRecordId;
+  int? _activeSetIndex;
+  String? _activeField; // 'weight' or 'reps'
+  String _currentValue = '';
 
   @override
   void initState() {
@@ -336,10 +344,10 @@ class _HomePageState extends State<HomePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => _ExerciseSelectModal(
+      builder: (modalContext) => _ExerciseSelectModal(
         exercises: exercises,
         onSelect: (exercise) {
-          Navigator.pop(context);
+          Navigator.pop(modalContext);
           _addExerciseToRecord(exercise);
         },
         onAddNew: (name, tag) async {
@@ -352,8 +360,8 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             exercises = _storage.getExercises();
           });
-          if (mounted) {
-            Navigator.pop(context);
+          if (modalContext.mounted) {
+            Navigator.pop(modalContext);
           }
           _addExerciseToRecord(exercise);
         },
@@ -369,7 +377,7 @@ class _HomePageState extends State<HomePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => _OrderChangeModal(
+      builder: (modalContext) => _OrderChangeModal(
         records: dateRecords,
         exercises: exercises,
         onOrderChanged: (newRecords) async {
@@ -380,11 +388,11 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _loadDateRecords();
           });
-          if (mounted) Navigator.pop(context);
+          if (modalContext.mounted) Navigator.pop(modalContext);
         },
         onDelete: (recordId) async {
           await _deleteRecord(recordId);
-          if (mounted) Navigator.pop(context);
+          if (modalContext.mounted) Navigator.pop(modalContext);
         },
       ),
     );
@@ -474,108 +482,240 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 커스텀 키보드 표시
+  void _showKeyboard(String recordId, int setIndex, String field, String initialValue) {
+    setState(() {
+      _isKeyboardVisible = true;
+      _activeRecordId = recordId;
+      _activeSetIndex = setIndex;
+      _activeField = field;
+      _currentValue = initialValue;
+    });
+  }
+
+  // 커스텀 키보드 숨기기
+  void _hideKeyboard() {
+    // 현재 값 저장
+    if (_activeRecordId != null && _activeSetIndex != null && _activeField != null) {
+      final record = dateRecords.firstWhere(
+        (r) => r.id == _activeRecordId,
+        orElse: () => Record(id: '', date: '', exerciseId: '', sets: []),
+      );
+      if (record.id.isNotEmpty && _activeSetIndex! < record.sets.length) {
+        if (_activeField == 'weight') {
+          final weight = double.tryParse(_currentValue);
+          if (weight != null) {
+            _updateSet(record, _activeSetIndex!, weight: weight);
+          }
+        } else if (_activeField == 'reps') {
+          final reps = int.tryParse(_currentValue);
+          if (reps != null) {
+            _updateSet(record, _activeSetIndex!, reps: reps);
+          }
+        }
+      }
+    }
+
+    setState(() {
+      _isKeyboardVisible = false;
+      _activeRecordId = null;
+      _activeSetIndex = null;
+      _activeField = null;
+      _currentValue = '';
+    });
+  }
+
+  // 키보드 입력 처리
+  void _handleKeyboardInput(String key) {
+    setState(() {
+      if (key == 'backspace') {
+        if (_currentValue.isNotEmpty) {
+          _currentValue = _currentValue.substring(0, _currentValue.length - 1);
+        }
+      } else if (key.startsWith('+') || key.startsWith('-')) {
+        // 증감 연산
+        final modifier = int.tryParse(key) ?? 0;
+        final current = double.tryParse(_currentValue) ?? 0;
+        final newValue = current + modifier;
+        if (newValue >= 0) {
+          if (newValue == newValue.toInt()) {
+            _currentValue = newValue.toInt().toString();
+          } else {
+            _currentValue = newValue.toString();
+          }
+        }
+      } else if (key == '.') {
+        if (!_currentValue.contains('.')) {
+          if (_currentValue.isEmpty) {
+            _currentValue = '0.';
+          } else {
+            _currentValue += '.';
+          }
+        }
+      } else {
+        _currentValue += key;
+      }
+
+      // 실시간으로 값 업데이트
+      if (_activeRecordId != null && _activeSetIndex != null && _activeField != null) {
+        final record = dateRecords.firstWhere(
+          (r) => r.id == _activeRecordId,
+          orElse: () => Record(id: '', date: '', exerciseId: '', sets: []),
+        );
+        if (record.id.isNotEmpty && _activeSetIndex! < record.sets.length) {
+          if (_activeField == 'weight') {
+            final weight = double.tryParse(_currentValue);
+            record.sets[_activeSetIndex!].weight = weight;
+            _storage.updateRecord(record);
+          } else if (_activeField == 'reps') {
+            final reps = int.tryParse(_currentValue);
+            record.sets[_activeSetIndex!].reps = reps;
+            _storage.updateRecord(record);
+          }
+        }
+      }
+    });
+  }
+
+  // 다음 필드로 이동
+  void _moveToNextField() {
+    if (_activeRecordId == null || _activeSetIndex == null || _activeField == null) return;
+
+    final recordIndex = dateRecords.indexWhere((r) => r.id == _activeRecordId);
+    if (recordIndex == -1) return;
+
+    final record = dateRecords[recordIndex];
+
+    if (_activeField == 'weight') {
+      // 무게 -> 횟수로 이동
+      final repsValue = record.sets[_activeSetIndex!].reps?.toString() ?? '';
+      _showKeyboard(_activeRecordId!, _activeSetIndex!, 'reps', repsValue);
+    } else if (_activeField == 'reps') {
+      // 횟수 -> 다음 세트의 무게로 이동
+      if (_activeSetIndex! + 1 < record.sets.length) {
+        // 같은 운동의 다음 세트
+        final weightValue = record.sets[_activeSetIndex! + 1].weight?.toString() ?? '';
+        _showKeyboard(_activeRecordId!, _activeSetIndex! + 1, 'weight', weightValue);
+      } else if (recordIndex + 1 < dateRecords.length) {
+        // 다음 운동의 첫 번째 세트
+        final nextRecord = dateRecords[recordIndex + 1];
+        if (nextRecord.sets.isNotEmpty) {
+          final weightValue = nextRecord.sets[0].weight?.toString() ?? '';
+          _showKeyboard(nextRecord.id, 0, 'weight', weightValue);
+        } else {
+          _hideKeyboard();
+        }
+      } else {
+        // 마지막 필드면 키보드 닫기
+        _hideKeyboard();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
+      child: Stack(
         children: [
-          // 상단 헤더 영역 (고정)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Column(
-              children: [
-                // 날짜 헤더
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            children: [
+              // 상단 헤더 영역 (고정)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
                   children: [
-                    // 왼쪽: 날짜 + Today 뱃지
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              _formatDateKorean(selectedDate),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1F2937),
+                    // 날짜 헤더
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // 왼쪽: 날짜 + Today 뱃지
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _formatDateKorean(selectedDate),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1F2937),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              const SizedBox(width: 8),
+                              // Today 뱃지 또는 버튼
+                              if (_isToday(selectedDate))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA295D5).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Today',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFFA295D5),
+                                    ),
+                                  ),
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: _goToToday,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3F4F6),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'Today',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF9CA3AF),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          // Today 뱃지 또는 버튼
-                          if (_isToday(selectedDate))
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFA295D5).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'Today',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFFA295D5),
-                                ),
-                              ),
-                            )
-                          else
+                        ),
+                        // 오른쪽: 캘린더 아이콘 + 메뉴 아이콘
+                        Row(
+                          children: [
                             GestureDetector(
-                              onTap: _goToToday,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF3F4F6),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'Today',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF9CA3AF),
+                              onTap: _selectDate,
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: SvgPicture.asset(
+                                  'assets/icons/calendar.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: const ColorFilter.mode(
+                                    Color(0xFF6E6475),
+                                    BlendMode.srcIn,
                                   ),
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    // 오른쪽: 캘린더 아이콘 + 메뉴 아이콘
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: _selectDate,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: SvgPicture.asset(
-                              'assets/icons/calendar.svg',
-                              width: 24,
-                              height: 24,
-                              colorFilter: const ColorFilter.mode(
-                                Color(0xFF6E6475),
-                                BlendMode.srcIn,
+                            GestureDetector(
+                              onTap: _showOrderModal,
+                              child: const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Icon(
+                                  Icons.menu,
+                                  size: 24,
+                                  color: Color(0xFF6E6475),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _showOrderModal,
-                          child: const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Icon(
-                              Icons.menu,
-                              size: 24,
-                              color: Color(0xFF6E6475),
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
 
                 const SizedBox(height: 16),
 
@@ -762,9 +902,31 @@ class _HomePageState extends State<HomePage> {
                         onGrowthTap: () => _showExerciseHistoryModal(record.exerciseId, exerciseName),
                         onNameTap: () => _showDifficultyModal(record, exerciseName),
                         previousDifficulty: _getPreviousDifficulty(record),
+                        // 커스텀 키보드 관련
+                        isKeyboardActive: _isKeyboardVisible &&
+                            _activeRecordId == record.id,
+                        activeSetIndex: _activeSetIndex,
+                        activeField: _activeField,
+                        currentValue: _currentValue,
+                        onFieldTap: (setIndex, field, initialValue) =>
+                            _showKeyboard(record.id, setIndex, field, initialValue),
                       );
                     },
                   ),
+            ),
+          ],
+        ),
+        // 커스텀 키보드
+        if (_isKeyboardVisible)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: CustomKeyboard(
+              onKeyPressed: _handleKeyboardInput,
+              onNext: _moveToNextField,
+              onClose: _hideKeyboard,
+            ),
           ),
         ],
       ),
@@ -785,6 +947,12 @@ class _ExerciseCard extends StatelessWidget {
   final VoidCallback? onGrowthTap;
   final VoidCallback? onNameTap;
   final String? previousDifficulty;
+  // 커스텀 키보드 관련
+  final bool isKeyboardActive;
+  final int? activeSetIndex;
+  final String? activeField;
+  final String currentValue;
+  final Function(int setIndex, String field, String initialValue) onFieldTap;
 
   const _ExerciseCard({
     required this.record,
@@ -797,6 +965,11 @@ class _ExerciseCard extends StatelessWidget {
     required this.onUpdateSet,
     this.onGrowthTap,
     this.onNameTap,
+    required this.isKeyboardActive,
+    this.activeSetIndex,
+    this.activeField,
+    required this.currentValue,
+    required this.onFieldTap,
     this.previousDifficulty,
   });
 
@@ -864,6 +1037,14 @@ class _ExerciseCard extends StatelessWidget {
             final checkKey = '${record.id}-$index';
             final isChecked = checkedSets[checkKey] ?? false;
 
+            // 현재 활성화된 필드인지 확인
+            final isWeightActive = isKeyboardActive && activeSetIndex == index && activeField == 'weight';
+            final isRepsActive = isKeyboardActive && activeSetIndex == index && activeField == 'reps';
+
+            // 표시할 값 결정 (활성화된 필드면 currentValue, 아니면 저장된 값)
+            final weightDisplay = isWeightActive ? currentValue : (set.weight?.toString() ?? '');
+            final repsDisplay = isRepsActive ? currentValue : (set.reps?.toString() ?? '');
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
@@ -880,33 +1061,32 @@ class _ExerciseCard extends StatelessWidget {
                     ),
                   ),
 
-                  // 무게 입력
+                  // 무게 입력 (커스텀 키보드용)
                   Expanded(
-                    child: Container(
-                      height: 36,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFD1D5DB)),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: set.weight?.toString() ?? '',
+                    child: GestureDetector(
+                      onTap: () => onFieldTap(index, 'weight', set.weight?.toString() ?? ''),
+                      child: Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isWeightActive
+                                ? const Color(0xFFA295D5)
+                                : const Color(0xFFD1D5DB),
+                            width: isWeightActive ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        textAlign: TextAlign.center,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: '무게',
-                          hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Center(
+                          child: Text(
+                            weightDisplay.isEmpty ? '무게' : weightDisplay,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: weightDisplay.isEmpty
+                                  ? const Color(0xFF9CA3AF)
+                                  : const Color(0xFF1F2937),
+                            ),
+                          ),
                         ),
-                        style: const TextStyle(fontSize: 14),
-                        onChanged: (value) {
-                          final weight = double.tryParse(value);
-                          if (weight != null) {
-                            onUpdateSet(index, weight: weight);
-                          }
-                        },
                       ),
                     ),
                   ),
@@ -916,33 +1096,32 @@ class _ExerciseCard extends StatelessWidget {
                     child: Text('kg', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
                   ),
 
-                  // 횟수 입력
+                  // 횟수 입력 (커스텀 키보드용)
                   Expanded(
-                    child: Container(
-                      height: 36,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFD1D5DB)),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: set.reps?.toString() ?? '',
+                    child: GestureDetector(
+                      onTap: () => onFieldTap(index, 'reps', set.reps?.toString() ?? ''),
+                      child: Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isRepsActive
+                                ? const Color(0xFFA295D5)
+                                : const Color(0xFFD1D5DB),
+                            width: isRepsActive ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: '횟수',
-                          hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Center(
+                          child: Text(
+                            repsDisplay.isEmpty ? '횟수' : repsDisplay,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: repsDisplay.isEmpty
+                                  ? const Color(0xFF9CA3AF)
+                                  : const Color(0xFF1F2937),
+                            ),
+                          ),
                         ),
-                        style: const TextStyle(fontSize: 14),
-                        onChanged: (value) {
-                          final reps = int.tryParse(value);
-                          if (reps != null) {
-                            onUpdateSet(index, reps: reps);
-                          }
-                        },
                       ),
                     ),
                   ),

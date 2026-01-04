@@ -49,10 +49,18 @@ class _ExercisePageState extends State<ExercisePage> {
     return _storage.getExerciseHistory(exerciseId).length;
   }
 
+  // 기존 태그 목록 가져오기
+  List<String> get _existingTags {
+    final tags = _exercises.map((e) => e.tag).toSet().toList();
+    tags.sort();
+    return tags;
+  }
+
   // 운동 추가 모달
   void _showAddExerciseModal() {
     final nameController = TextEditingController();
-    String selectedTag = '가슴';
+    final tagController = TextEditingController();
+    String? selectedTag;
 
     showModalBottomSheet(
       context: context,
@@ -128,7 +136,7 @@ class _ExercisePageState extends State<ExercisePage> {
               ),
               const SizedBox(height: 16),
 
-              // 태그 선택
+              // 태그 입력
               const Text(
                 '태그',
                 style: TextStyle(
@@ -138,91 +146,135 @@ class _ExercisePageState extends State<ExercisePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: ['가슴', '등', '하체', '어깨', '팔', '복근'].map((tag) {
-                  final isSelected = selectedTag == tag;
-                  return GestureDetector(
-                    onTap: () {
-                      setModalState(() {
-                        selectedTag = tag;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFFA295D5)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
+              TextField(
+                controller: tagController,
+                decoration: InputDecoration(
+                  hintText: '예: 가슴, 등, 하체',
+                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (value) {
+                  setModalState(() {
+                    selectedTag = null;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // 기존 태그 목록
+              if (_existingTags.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _existingTags.map((tag) {
+                    final isSelected = selectedTag == tag;
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          selectedTag = tag;
+                          tagController.text = tag;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
                           color: isSelected
                               ? const Color(0xFFA295D5)
-                              : const Color(0xFFE5E7EB),
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFFA295D5)
+                                : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                        child: Text(
+                          tag,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF6B7280),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        tag,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF6B7280),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+              ] else
+                const SizedBox(height: 12),
 
               // 추가 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (nameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('운동 이름을 입력하세요')),
-                      );
-                      return;
-                    }
-
-                    final exercise = Exercise(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nameController.text.trim(),
-                      tag: selectedTag,
+              GestureDetector(
+                onTap: () async {
+                  if (nameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('운동 이름을 입력하세요')),
                     );
+                    return;
+                  }
+                  if (tagController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('태그를 입력하세요')),
+                    );
+                    return;
+                  }
 
-                    await _storage.addExercise(exercise);
-                    setState(() {
-                      _exercises = _storage.getExercises();
-                    });
+                  final exercise = Exercise(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: nameController.text.trim(),
+                    tag: tagController.text.trim(),
+                  );
 
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${nameController.text.trim()} 추가됨'),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFA295D5),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  await _storage.addExercise(exercise);
+                  setState(() {
+                    _exercises = _storage.getExercises();
+                  });
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${nameController.text.trim()} 추가됨'),
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFA295D5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    '추가',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  child: const Center(
+                    child: Text(
+                      '추가',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -390,7 +442,8 @@ class _ExercisePageState extends State<ExercisePage> {
   // 운동 수정 모달
   void _showEditExerciseModal(Exercise exercise) {
     final nameController = TextEditingController(text: exercise.name);
-    String selectedTag = exercise.tag;
+    final tagController = TextEditingController(text: exercise.tag);
+    String? selectedTag = exercise.tag;
 
     showModalBottomSheet(
       context: context,
@@ -466,7 +519,7 @@ class _ExercisePageState extends State<ExercisePage> {
               ),
               const SizedBox(height: 16),
 
-              // 태그 선택
+              // 태그 입력
               const Text(
                 '태그',
                 style: TextStyle(
@@ -476,96 +529,140 @@ class _ExercisePageState extends State<ExercisePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: ['가슴', '등', '하체', '어깨', '팔', '복근'].map((tag) {
-                  final isSelected = selectedTag == tag;
-                  return GestureDetector(
-                    onTap: () {
-                      setModalState(() {
-                        selectedTag = tag;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFFA295D5)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
+              TextField(
+                controller: tagController,
+                decoration: InputDecoration(
+                  hintText: '예: 가슴, 등, 하체',
+                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (value) {
+                  setModalState(() {
+                    selectedTag = null;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // 기존 태그 목록
+              if (_existingTags.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _existingTags.map((tag) {
+                    final isSelected = selectedTag == tag;
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          selectedTag = tag;
+                          tagController.text = tag;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
                           color: isSelected
                               ? const Color(0xFFA295D5)
-                              : const Color(0xFFE5E7EB),
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFFA295D5)
+                                : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                        child: Text(
+                          tag,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF6B7280),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        tag,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF6B7280),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+              ] else
+                const SizedBox(height: 12),
 
               // 저장 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (nameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('운동 이름을 입력하세요')),
-                      );
-                      return;
-                    }
-
-                    final updatedExercise = Exercise(
-                      id: exercise.id,
-                      name: nameController.text.trim(),
-                      tag: selectedTag,
+              GestureDetector(
+                onTap: () async {
+                  if (nameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('운동 이름을 입력하세요')),
                     );
+                    return;
+                  }
+                  if (tagController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('태그를 입력하세요')),
+                    );
+                    return;
+                  }
 
-                    // 운동 목록 업데이트
-                    final exercises = _storage.getExercises();
-                    final index = exercises.indexWhere((e) => e.id == exercise.id);
-                    if (index != -1) {
-                      exercises[index] = updatedExercise;
-                      await _storage.saveExercises(exercises);
-                    }
+                  final updatedExercise = Exercise(
+                    id: exercise.id,
+                    name: nameController.text.trim(),
+                    tag: tagController.text.trim(),
+                  );
 
-                    setState(() {
-                      _exercises = _storage.getExercises();
-                    });
+                  // 운동 목록 업데이트
+                  final exercises = _storage.getExercises();
+                  final index = exercises.indexWhere((e) => e.id == exercise.id);
+                  if (index != -1) {
+                    exercises[index] = updatedExercise;
+                    await _storage.saveExercises(exercises);
+                  }
 
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('수정되었습니다')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFA295D5),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  setState(() {
+                    _exercises = _storage.getExercises();
+                  });
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('수정되었습니다')),
+                    );
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFA295D5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    '저장',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  child: const Center(
+                    child: Text(
+                      '저장',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ),

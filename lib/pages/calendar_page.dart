@@ -26,7 +26,9 @@ class _CalendarPageState extends State<CalendarPage> {
     _loadData();
   }
 
-  void _loadData() {
+  Future<void> _loadData() async {
+    await _storage.init();
+    if (!mounted) return;
     setState(() {
       _records = _storage.getRecords();
       _exercises = _storage.getExercises();
@@ -90,7 +92,7 @@ class _CalendarPageState extends State<CalendarPage> {
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     final date = DateTime(_currentMonth.year, _currentMonth.month, day);
     final weekday = weekdays[date.weekday - 1];
-    return '${_currentMonth.month}월 ${day}일 $weekday요일';
+    return '${_currentMonth.month}월 $day일 $weekday요일';
   }
 
   // 볼륨 계산
@@ -341,22 +343,24 @@ class _CalendarPageState extends State<CalendarPage> {
                             ),
                           );
                         }),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _handleEditDate,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFA295D5),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                        GestureDetector(
+                          onTap: _handleEditDate,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFA295D5),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
-                              '이 날짜 편집하기',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            child: const Center(
+                              child: Text(
+                                '이 날짜 편집하기',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -372,7 +376,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Image.asset(
-                                      'assets/angry.png',
+                                      'assets/home.png',
                                       width: 160,
                                       errorBuilder: (context, error, stackTrace) =>
                                           const SizedBox(height: 100),
@@ -385,22 +389,24 @@ class _CalendarPageState extends State<CalendarPage> {
                                   ],
                                 ),
                               ),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _handleEditDate,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFA295D5),
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
+                              GestureDetector(
+                                onTap: _handleEditDate,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA295D5),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Text(
-                                    '이 날짜 편집하기',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                                  child: const Center(
+                                    child: Text(
+                                      '이 날짜 편집하기',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),

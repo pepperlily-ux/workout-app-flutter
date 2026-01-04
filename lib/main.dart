@@ -6,6 +6,7 @@ import 'pages/home_page.dart';
 import 'pages/calendar_page.dart';
 import 'pages/routine_page.dart';
 import 'pages/exercise_page.dart';
+import 'pages/splash_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,9 +21,36 @@ class MyApp extends StatelessWidget {
       title: '메타몽 과부하',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFA295D5)),
+        scaffoldBackgroundColor: Colors.white,
       ),
-      home: const MainScreen(),
+      home: const AppWrapper(),
     );
+  }
+}
+
+// 스플래시 화면과 메인 화면을 감싸는 래퍼
+class AppWrapper extends StatefulWidget {
+  const AppWrapper({super.key});
+
+  @override
+  State<AppWrapper> createState() => _AppWrapperState();
+}
+
+class _AppWrapperState extends State<AppWrapper> {
+  bool _showSplash = true;
+
+  void _onSplashComplete() {
+    setState(() {
+      _showSplash = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return SplashPage(onComplete: _onSplashComplete);
+    }
+    return const MainScreen();
   }
 }
 

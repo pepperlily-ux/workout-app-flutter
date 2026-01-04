@@ -146,4 +146,60 @@ class StorageService {
     checkedSets[key] = !(checkedSets[key] ?? false);
     await saveCheckedSets(checkedSets);
   }
+
+  // === 데이터 내보내기/가져오기 ===
+
+  // 모든 데이터를 JSON 문자열로 내보내기
+  String exportAllData() {
+    final data = {
+      'exercises': getExercises().map((e) => e.toJson()).toList(),
+      'records': getRecords().map((r) => r.toJson()).toList(),
+      'routines': getRoutines().map((r) => r.toJson()).toList(),
+      'exportedAt': DateTime.now().toIso8601String(),
+      'version': '1.0',
+    };
+    return jsonEncode(data);
+  }
+
+  // JSON 문자열에서 데이터 가져오기
+  Future<Map<String, int>> importAllData(String jsonString) async {
+    try {
+      final data = jsonDecode(jsonString) as Map<String, dynamic>;
+
+      // 운동 종목 가져오기
+      int exerciseCount = 0;
+      if (data['exercises'] != null) {
+        final exercisesList = data['exercises'] as List;
+        final exercises = exercisesList.map((e) => Exercise.fromJson(e)).toList();
+        await saveExercises(exercises);
+        exerciseCount = exercises.length;
+      }
+
+      // 기록 가져오기
+      int recordCount = 0;
+      if (data['records'] != null) {
+        final recordsList = data['records'] as List;
+        final records = recordsList.map((r) => Record.fromJson(r)).toList();
+        await saveRecords(records);
+        recordCount = records.length;
+      }
+
+      // 루틴 가져오기
+      int routineCount = 0;
+      if (data['routines'] != null) {
+        final routinesList = data['routines'] as List;
+        final routines = routinesList.map((r) => Routine.fromJson(r)).toList();
+        await saveRoutines(routines);
+        routineCount = routines.length;
+      }
+
+      return {
+        'exercises': exerciseCount,
+        'records': recordCount,
+        'routines': routineCount,
+      };
+    } catch (e) {
+      throw FormatException('올바르지 않은 데이터 형식입니다: $e');
+    }
+  }
 }
