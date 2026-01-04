@@ -1,0 +1,2036 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../models/exercise.dart';
+import '../models/record.dart';
+import '../models/routine.dart';
+import '../models/workout_set.dart';
+import '../services/storage_service.dart';
+
+// 홈 화면
+class HomePage extends StatefulWidget {
+  final String? initialDate; // 외부에서 전달받은 초기 날짜 (yyyy-MM-dd)
+
+  const HomePage({super.key, this.initialDate});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final StorageService _storage = StorageService();
+
+  late DateTime selectedDate;
+  List<Record> dateRecords = [];
+  List<Exercise> exercises = [];
+  List<Routine> routines = [];
+  Map<String, bool> checkedSets = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // 외부에서 전달받은 날짜가 있으면 그 날짜로, 아니면 오늘 날짜로 초기화
+    if (widget.initialDate != null) {
+      selectedDate = DateTime.tryParse(widget.initialDate!) ?? DateTime.now();
+    } else {
+      selectedDate = DateTime.now();
+    }
+    _loadData();
+  }
+
+  // 데이터 불러오기
+  Future<void> _loadData() async {
+    await _storage.init();
+    setState(() {
+      exercises = _storage.getExercises();
+      routines = _storage.getRoutines();
+      checkedSets = _storage.getCheckedSets();
+      _loadDateRecords();
+    });
+  }
+
+  // 선택된 날짜의 기록 불러오기
+  void _loadDateRecords() {
+    final dateStr = _formatDate(selectedDate);
+    dateRecords = _storage.getRecordsByDate(dateStr);
+  }
+
+  // 날짜 포맷 (yyyy-MM-dd)
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  // 날짜를 한국어로 포맷 (예: "1월 4일 토요일")
+  String _formatDateKorean(DateTime date) {
+    const weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+    final weekday = weekdays[date.weekday - 1];
+    return '${date.month}월 ${date.day}일 $weekday';
+  }
+
+  // 오늘인지 확인
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
+
+  // 오늘 날짜로 이동
+  void _goToToday() {
+    setState(() {
+      selectedDate = DateTime.now();
+      _loadDateRecords();
+    });
+  }
+
+  // 날짜 선택
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        selectedDate = picked;
+        _loadDateRecords();
+      });
+    }
+  }
+
+  // 운동 이름 가져오기
+  String _getExerciseName(String exerciseId) {
+    final exercise = exercises.firstWhere(
+      (e) => e.id == exerciseId,
+      orElse: () => Exercise(id: '', name: '알 수 없음', tag: ''),
+    );
+    return exercise.name;
+  }
+
+  // 운동 추가 (기록에)
+  Future<void> _addExerciseToRecord(Exercise exercise) async {
+    // 이전 기록에서 세트 정보 가져오기
+    final history = _storage.getExerciseHistory(exercise.id);
+    List<WorkoutSet> initialSets = [];
+
+    if (history.isNotEmpty) {
+      // 가장 최근 기록의 세트를 복사
+      initialSets = history.first.sets.map((s) => WorkoutSet(
+        weight: s.weight,
+        reps: s.reps,
+      )).toList();
+    } else {
+      // 이전 기록이 없으면 빈 세트 1개
+      initialSets = [WorkoutSet()];
+    }
+
+    final record = Record(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: _formatDate(selectedDate),
+      exerciseId: exercise.id,
+      sets: initialSets,
+      order: dateRecords.length,
+    );
+
+    await _storage.addRecord(record);
+    setState(() {
+      _loadDateRecords();
+    });
+  }
+
+  // 루틴 선택 (여러 운동 한번에 추가)
+  Future<void> _selectRoutine(Routine routine) async {
+    for (final exerciseId in routine.exerciseIds) {
+      final exercise = exercises.firstWhere(
+        (e) => e.id == exerciseId,
+        orElse: () => Exercise(id: '', name: '', tag: ''),
+      );
+      if (exercise.id.isNotEmpty) {
+        await _addExerciseToRecord(exercise);
+      }
+    }
+  }
+
+  // 세트 추가
+  Future<void> _addSet(Record record) async {
+    record.sets.add(WorkoutSet());
+    await _storage.updateRecord(record);
+    setState(() {
+      _loadDateRecords();
+    });
+  }
+
+  // 세트 삭제
+  Future<void> _removeSet(Record record) async {
+    if (record.sets.isNotEmpty) {
+      record.sets.removeLast();
+      await _storage.updateRecord(record);
+      setState(() {
+        _loadDateRecords();
+      });
+    }
+  }
+
+  // 세트 체크 토글
+  Future<void> _toggleCheck(String recordId, int setIndex) async {
+    await _storage.toggleSetCheck(recordId, setIndex);
+    setState(() {
+      checkedSets = _storage.getCheckedSets();
+    });
+  }
+
+  // 세트 값 업데이트
+  Future<void> _updateSet(Record record, int setIndex, {double? weight, int? reps}) async {
+    if (setIndex < record.sets.length) {
+      if (weight != null) record.sets[setIndex].weight = weight;
+      if (reps != null) record.sets[setIndex].reps = reps;
+      await _storage.updateRecord(record);
+      setState(() {
+        _loadDateRecords();
+      });
+    }
+  }
+
+  // 기록 삭제
+  Future<void> _deleteRecord(String recordId) async {
+    await _storage.deleteRecord(recordId);
+    setState(() {
+      _loadDateRecords();
+    });
+  }
+
+  // 성장률 계산 (개별 운동) - 원본 PWA와 동일한 로직
+  double? _calculateGrowth(String exerciseId) {
+    final history = _storage.getExerciseHistory(exerciseId);
+    final selectedDateStr = _formatDate(selectedDate);
+
+    // 선택된 날짜의 기록 찾기
+    final todayRecord = history.firstWhere(
+      (r) => r.date == selectedDateStr,
+      orElse: () => Record(id: '', date: '', exerciseId: '', sets: []),
+    );
+
+    // 이전 기록 찾기: 선택된 날짜보다 이전 날짜 중 가장 최근 기록
+    // history는 이미 최신순 정렬되어 있음 (getExerciseHistory에서)
+    Record? previousRecord;
+    for (final r in history) {
+      if (r.date.compareTo(selectedDateStr) < 0 && r.totalVolume > 0) {
+        previousRecord = r;
+        break;
+      }
+    }
+
+    if (todayRecord.id.isEmpty || previousRecord == null) return null;
+    if (todayRecord.totalVolume == 0 || previousRecord.totalVolume == 0) return null;
+
+    final growth = ((todayRecord.totalVolume - previousRecord.totalVolume) / previousRecord.totalVolume) * 100;
+    return growth;
+  }
+
+  // 루틴 전체 성장률 계산 - 원본 PWA와 동일한 로직
+  // 원본: 총 볼륨을 합산한 후 비율 계산 (개별 성장률 평균 X)
+  Map<String, dynamic>? _calculateRoutineGrowth() {
+    if (dateRecords.isEmpty) return null;
+
+    final selectedDateStr = _formatDate(selectedDate);
+    double totalCurrentVolume = 0;
+    double totalPreviousVolume = 0;
+    int commonCount = 0;
+    String? mostRecentComparisonDate;
+    List<Map<String, dynamic>> comparisons = [];
+
+    for (final record in dateRecords) {
+      // 볼륨이 있는 기록만 처리
+      if (record.totalVolume <= 0) continue;
+
+      final history = _storage.getExerciseHistory(record.exerciseId);
+
+      // 이전 기록 찾기: 선택된 날짜보다 이전 날짜 중 가장 최근 기록
+      Record? previousRecord;
+      for (final r in history) {
+        if (r.date.compareTo(selectedDateStr) < 0 && r.totalVolume > 0) {
+          previousRecord = r;
+          break;
+        }
+      }
+
+      if (previousRecord != null) {
+        final currentVolume = record.totalVolume;
+        final previousVolume = previousRecord.totalVolume;
+
+        totalCurrentVolume += currentVolume;
+        totalPreviousVolume += previousVolume;
+        commonCount++;
+
+        // 가장 최근 비교 날짜 추적
+        if (mostRecentComparisonDate == null || previousRecord.date.compareTo(mostRecentComparisonDate) > 0) {
+          mostRecentComparisonDate = previousRecord.date;
+        }
+
+        // 비교 데이터 저장 (모달에서 사용)
+        comparisons.add({
+          'exerciseId': record.exerciseId,
+          'currentRecord': record,
+          'previousRecord': previousRecord,
+          'currentVolume': currentVolume,
+          'previousVolume': previousVolume,
+          'growth': ((currentVolume - previousVolume) / previousVolume) * 100,
+        });
+      }
+    }
+
+    if (commonCount == 0 || totalPreviousVolume == 0) return null;
+
+    // 총 볼륨 비교로 성장률 계산 (원본과 동일)
+    final growth = ((totalCurrentVolume - totalPreviousVolume) / totalPreviousVolume) * 100;
+
+    return {
+      'growth': growth,
+      'previousDate': mostRecentComparisonDate,
+      'commonCount': commonCount,
+      'comparisons': comparisons,
+    };
+  }
+
+  // 성장률에 따른 메시지 반환
+  String _getGrowthMessage(double growth) {
+    if (growth < -5) return '오늘은 퇴보하는 날이었네요';
+    if (growth >= -5 && growth <= 0) return '오늘은 성장하지 못했습니다';
+    if (growth > 0 && growth < 1.5) return '미세하지만 좋은 시도였습니다';
+    if (growth >= 1.5 && growth < 3) return '근육이 성장하는 최적의 구간!';
+    if (growth >= 3 && growth < 5) return '근육에 강한 자극을 받았습니다.';
+    if (growth >= 5) return '헉! 너무 무리하시는거 아니에요?';
+    return '';
+  }
+
+  // 날짜 문자열을 한국어로 변환
+  String _formatDateStrKorean(String dateStr) {
+    final parts = dateStr.split('-');
+    if (parts.length != 3) return dateStr;
+    return '${int.parse(parts[1])}월 ${int.parse(parts[2])}일';
+  }
+
+  // 루틴 선택 모달 표시
+  void _showRoutineModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _RoutineSelectModal(
+        routines: routines,
+        exercises: exercises,
+        onSelect: (routine) {
+          Navigator.pop(context);
+          _selectRoutine(routine);
+        },
+      ),
+    );
+  }
+
+  // 운동 추가 모달 표시
+  void _showExerciseModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _ExerciseSelectModal(
+        exercises: exercises,
+        onSelect: (exercise) {
+          Navigator.pop(context);
+          _addExerciseToRecord(exercise);
+        },
+        onAddNew: (name, tag) async {
+          final exercise = Exercise(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: name,
+            tag: tag,
+          );
+          await _storage.addExercise(exercise);
+          setState(() {
+            exercises = _storage.getExercises();
+          });
+          if (mounted) {
+            Navigator.pop(context);
+          }
+          _addExerciseToRecord(exercise);
+        },
+      ),
+    );
+  }
+
+  // 순서 변경 모달 표시
+  void _showOrderModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _OrderChangeModal(
+        records: dateRecords,
+        exercises: exercises,
+        onOrderChanged: (newRecords) async {
+          for (int i = 0; i < newRecords.length; i++) {
+            newRecords[i].order = i;
+            await _storage.updateRecord(newRecords[i]);
+          }
+          setState(() {
+            _loadDateRecords();
+          });
+          if (mounted) Navigator.pop(context);
+        },
+        onDelete: (recordId) async {
+          await _deleteRecord(recordId);
+          if (mounted) Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  // 성장률 상세 모달 표시
+  void _showGrowthDetailModal(Map<String, dynamic> routineGrowth) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _GrowthDetailModal(
+        routineGrowth: routineGrowth,
+        exercises: exercises,
+        formatDateStrKorean: _formatDateStrKorean,
+      ),
+    );
+  }
+
+  // 개별 운동 히스토리 모달 표시
+  void _showExerciseHistoryModal(String exerciseId, String exerciseName) {
+    final history = _storage.getExerciseHistory(exerciseId);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _ExerciseHistoryModal(
+        exerciseName: exerciseName,
+        history: history,
+        formatDateStrKorean: _formatDateStrKorean,
+      ),
+    );
+  }
+
+  // 이전 난이도 가져오기
+  String? _getPreviousDifficulty(Record record) {
+    final history = _storage.getExerciseHistory(record.exerciseId);
+    for (final r in history) {
+      if (r.date.compareTo(record.date) < 0 && r.difficulty != null) {
+        return r.difficulty;
+      }
+    }
+    return null;
+  }
+
+  // 난이도 선택 모달 표시
+  void _showDifficultyModal(Record record, String exerciseName) {
+    // 이전 기록에서 난이도 가져오기
+    final history = _storage.getExerciseHistory(record.exerciseId);
+    String? previousDifficulty;
+    for (final r in history) {
+      if (r.date.compareTo(record.date) < 0 && r.difficulty != null) {
+        previousDifficulty = r.difficulty;
+        break;
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _DifficultyModal(
+        exerciseName: exerciseName,
+        currentDifficulty: record.difficulty,
+        previousDifficulty: previousDifficulty,
+        onSelect: (difficulty) async {
+          record.difficulty = difficulty;
+          await _storage.updateRecord(record);
+          setState(() {
+            _loadDateRecords();
+          });
+          if (mounted) Navigator.pop(context);
+        },
+        onDelete: () async {
+          await _deleteRecord(record.id);
+          if (mounted) Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          // 상단 헤더 영역 (고정)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              children: [
+                // 날짜 헤더
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 왼쪽: 날짜 + Today 뱃지
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _formatDateKorean(selectedDate),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Today 뱃지 또는 버튼
+                          if (_isToday(selectedDate))
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFA295D5).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Today',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFA295D5),
+                                ),
+                              ),
+                            )
+                          else
+                            GestureDetector(
+                              onTap: _goToToday,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F4F6),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Today',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF9CA3AF),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // 오른쪽: 캘린더 아이콘 + 메뉴 아이콘
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: _selectDate,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: SvgPicture.asset(
+                              'assets/icons/calendar.svg',
+                              width: 24,
+                              height: 24,
+                              colorFilter: const ColorFilter.mode(
+                                Color(0xFF6E6475),
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _showOrderModal,
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.menu,
+                              size: 24,
+                              color: Color(0xFF6E6475),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // 루틴 성장률 카드
+                Builder(
+                  builder: (context) {
+                    final routineGrowth = _calculateRoutineGrowth();
+                    if (routineGrowth == null) return const SizedBox.shrink();
+
+                    final growth = routineGrowth['growth'] as double;
+                    final previousDate = routineGrowth['previousDate'] as String?;
+                    final commonCount = routineGrowth['commonCount'] as int;
+
+                    // 성장률에 따른 색상
+                    Color bgColor;
+                    Color borderColor;
+                    Color textColor;
+
+                    if (growth > 0) {
+                      bgColor = const Color(0xFFFAFFFB);
+                      borderColor = const Color(0xFF78D2A8);
+                      textColor = const Color(0xFF2D9C61);
+                    } else if (growth == 0) {
+                      bgColor = const Color(0xFFF3F1FA);
+                      borderColor = const Color(0xFFD4CDEB);
+                      textColor = const Color(0xFF847DC4);
+                    } else {
+                      bgColor = const Color(0xFFFFF9FA);
+                      borderColor = const Color(0xFFF06B8A).withValues(alpha: 0.8);
+                      textColor = const Color(0xFFE75D7D).withValues(alpha: 0.8);
+                    }
+
+                    return GestureDetector(
+                      onTap: () => _showGrowthDetailModal(routineGrowth),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          border: Border.all(color: borderColor),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _getGrowthMessage(growth),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF374151),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'vs ${previousDate != null ? _formatDateStrKorean(previousDate) : ''} · $commonCount개 운동 비교',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // 루틴 선택 / 운동 추가 버튼
+                Row(
+                  children: [
+                    // 루틴 선택 버튼
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _showRoutineModal,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: const Color(0xFF8881CE)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '루틴 선택',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.normal,
+                                color: Color(0xFF847DC4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 운동 추가 버튼
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _showExerciseModal,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFA295D5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '운동 추가',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+
+          // 운동 기록 리스트 (스크롤 가능)
+          Expanded(
+            child: dateRecords.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/home.png',
+                          width: 200,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '루틴을 선택하거나 운동을 추가하세요',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: dateRecords.length,
+                    itemBuilder: (context, index) {
+                      final record = dateRecords[index];
+                      final growth = _calculateGrowth(record.exerciseId);
+                      final exerciseName = _getExerciseName(record.exerciseId);
+
+                      return _ExerciseCard(
+                        record: record,
+                        exerciseName: exerciseName,
+                        growth: growth,
+                        checkedSets: checkedSets,
+                        onAddSet: () => _addSet(record),
+                        onRemoveSet: () => _removeSet(record),
+                        onToggleCheck: (setIndex) => _toggleCheck(record.id, setIndex),
+                        onUpdateSet: (setIndex, {weight, reps}) =>
+                            _updateSet(record, setIndex, weight: weight, reps: reps),
+                        onGrowthTap: () => _showExerciseHistoryModal(record.exerciseId, exerciseName),
+                        onNameTap: () => _showDifficultyModal(record, exerciseName),
+                        previousDifficulty: _getPreviousDifficulty(record),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 운동 기록 카드 위젯
+class _ExerciseCard extends StatelessWidget {
+  final Record record;
+  final String exerciseName;
+  final double? growth;
+  final Map<String, bool> checkedSets;
+  final VoidCallback onAddSet;
+  final VoidCallback onRemoveSet;
+  final Function(int) onToggleCheck;
+  final Function(int, {double? weight, int? reps}) onUpdateSet;
+  final VoidCallback? onGrowthTap;
+  final VoidCallback? onNameTap;
+  final String? previousDifficulty;
+
+  const _ExerciseCard({
+    required this.record,
+    required this.exerciseName,
+    required this.growth,
+    required this.checkedSets,
+    required this.onAddSet,
+    required this.onRemoveSet,
+    required this.onToggleCheck,
+    required this.onUpdateSet,
+    this.onGrowthTap,
+    this.onNameTap,
+    this.previousDifficulty,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 운동 헤더 (이름 + 난이도 + 성장률)
+          Row(
+            children: [
+              // 운동 이름 (클릭 가능)
+              Expanded(
+                child: GestureDetector(
+                  onTap: onNameTap,
+                  child: Text(
+                    exerciseName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                ),
+              ),
+              // 난이도 뱃지
+              if (record.difficulty != null || previousDifficulty != null)
+                GestureDetector(
+                  onTap: onNameTap,
+                  child: _buildDifficultyBadge(
+                    record.difficulty ?? previousDifficulty!,
+                    isCurrentSelected: record.difficulty != null,
+                  ),
+                ),
+              if (growth != null) const SizedBox(width: 8),
+              // 성장률 뱃지
+              if (growth != null)
+                GestureDetector(
+                  onTap: onGrowthTap,
+                  child: _buildGrowthBadge(growth!),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // 세트 리스트
+          ...List.generate(record.sets.length, (index) {
+            final set = record.sets[index];
+            final checkKey = '${record.id}-$index';
+            final isChecked = checkedSets[checkKey] ?? false;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  // 세트 번호
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      '세트 ${index + 1}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ),
+
+                  // 무게 입력
+                  Expanded(
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: TextField(
+                        controller: TextEditingController(
+                          text: set.weight?.toString() ?? '',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '무게',
+                          hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        onChanged: (value) {
+                          final weight = double.tryParse(value);
+                          if (weight != null) {
+                            onUpdateSet(index, weight: weight);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Text('kg', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+                  ),
+
+                  // 횟수 입력
+                  Expanded(
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: TextField(
+                        controller: TextEditingController(
+                          text: set.reps?.toString() ?? '',
+                        ),
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '횟수',
+                          hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        onChanged: (value) {
+                          final reps = int.tryParse(value);
+                          if (reps != null) {
+                            onUpdateSet(index, reps: reps);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Text('회', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+                  ),
+
+                  // 체크 버튼
+                  GestureDetector(
+                    onTap: () => onToggleCheck(index),
+                    child: Container(
+                      width: 34,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isChecked ? const Color(0xFFA295D5) : Colors.white,
+                        border: Border.all(
+                          color: isChecked ? const Color(0xFFA295D5) : const Color(0xFFD1D5DB),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        size: 20,
+                        color: isChecked ? Colors.white : const Color(0xFFE5E7EB),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(height: 8),
+
+          // 세트 추가/삭제 버튼
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: record.sets.isEmpty ? null : onRemoveSet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '삭제',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: record.sets.isEmpty
+                              ? const Color(0xFFD1D5DB)
+                              : const Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: onAddSet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        '추가',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 난이도 정보 반환
+  Map<String, dynamic> _getDifficultyInfo(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return {'text': '쉬웠다', 'icon': Icons.sentiment_satisfied_alt};
+      case 'medium':
+        return {'text': '할만했다', 'icon': Icons.sentiment_neutral};
+      case 'hard':
+        return {'text': '겨우했다', 'icon': Icons.sentiment_very_dissatisfied};
+      default:
+        return {'text': '', 'icon': Icons.help_outline};
+    }
+  }
+
+  Widget _buildDifficultyBadge(String difficulty, {required bool isCurrentSelected}) {
+    final info = _getDifficultyInfo(difficulty);
+    final color = isCurrentSelected ? const Color(0xFFA295D5) : const Color(0xFF9CA3AF);
+    final bgColor = isCurrentSelected
+        ? const Color(0xFFA295D5).withValues(alpha: 0.1)
+        : const Color(0xFF9CA3AF).withValues(alpha: 0.1);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(info['icon'] as IconData, size: 16, color: color),
+          const SizedBox(width: 4),
+          Text(
+            info['text'] as String,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGrowthBadge(double growth) {
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+
+    if (growth > 0) {
+      bgColor = const Color(0xFFFAFFFB);
+      borderColor = const Color(0xFF78D2A8).withValues(alpha: 0.5);
+      textColor = const Color(0xFF2D9C61);
+    } else if (growth == 0) {
+      bgColor = const Color(0xFFF3F1FA);
+      borderColor = const Color(0xFFD4CDEB).withValues(alpha: 0.5);
+      textColor = const Color(0xFF847DC4);
+    } else {
+      bgColor = const Color(0xFFFFF9FA);
+      borderColor = const Color(0xFFF06B8A).withValues(alpha: 0.5);
+      textColor = const Color(0xFFE75D7D);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+// 루틴 선택 모달
+class _RoutineSelectModal extends StatelessWidget {
+  final List<Routine> routines;
+  final List<Exercise> exercises;
+  final Function(Routine) onSelect;
+
+  const _RoutineSelectModal({
+    required this.routines,
+    required this.exercises,
+    required this.onSelect,
+  });
+
+  String _getExerciseNames(List<String> exerciseIds) {
+    return exerciseIds.map((id) {
+      final exercise = exercises.firstWhere(
+        (e) => e.id == id,
+        orElse: () => Exercise(id: '', name: '', tag: ''),
+      );
+      return exercise.name;
+    }).where((name) => name.isNotEmpty).join(', ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '루틴 선택',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (routines.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: Text(
+                  '저장된 루틴이 없습니다',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ),
+            )
+          else
+            ...routines.map((routine) => GestureDetector(
+              onTap: () => onSelect(routine),
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      routine.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getExerciseNames(routine.exerciseIds),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )),
+        ],
+      ),
+    );
+  }
+}
+
+// 운동 선택 모달
+class _ExerciseSelectModal extends StatefulWidget {
+  final List<Exercise> exercises;
+  final Function(Exercise) onSelect;
+  final Function(String name, String tag) onAddNew;
+
+  const _ExerciseSelectModal({
+    required this.exercises,
+    required this.onSelect,
+    required this.onAddNew,
+  });
+
+  @override
+  State<_ExerciseSelectModal> createState() => _ExerciseSelectModalState();
+}
+
+class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
+  String selectedTag = '전체';
+  bool isAddingNew = false;
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController tagController = TextEditingController();
+
+  List<String> get tags {
+    final tagSet = widget.exercises.map((e) => e.tag).toSet();
+    return ['전체', ...tagSet];
+  }
+
+  List<Exercise> get filteredExercises {
+    if (selectedTag == '전체') return widget.exercises;
+    return widget.exercises.where((e) => e.tag == selectedTag).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '운동 선택',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    isAddingNew = !isAddingNew;
+                  });
+                },
+                child: Text(
+                  isAddingNew ? '취소' : '+ 새 운동',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFA295D5),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (isAddingNew) ...[
+            // 새 운동 추가 폼
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                hintText: '운동 이름',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: tagController,
+              decoration: InputDecoration(
+                hintText: '태그 (예: 가슴, 등, 하체)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.isNotEmpty && tagController.text.isNotEmpty) {
+                    widget.onAddNew(nameController.text, tagController.text);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFA295D5),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('운동 추가'),
+              ),
+            ),
+          ] else ...[
+            // 태그 필터
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: tags.map((tag) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedTag = tag;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: selectedTag == tag
+                            ? const Color(0xFFA295D5)
+                            : Colors.white,
+                        border: Border.all(
+                          color: selectedTag == tag
+                              ? const Color(0xFFA295D5)
+                              : const Color(0xFFD1D5DB),
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: selectedTag == tag
+                              ? Colors.white
+                              : const Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
+                  ),
+                )).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 운동 목록
+            Expanded(
+              child: filteredExercises.isEmpty
+                  ? const Center(
+                      child: Text(
+                        '등록된 운동이 없습니다',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filteredExercises.length,
+                      itemBuilder: (context, index) {
+                        final exercise = filteredExercises[index];
+                        return GestureDetector(
+                          onTap: () => widget.onSelect(exercise),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        exercise.name,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        exercise.tag,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF9CA3AF),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.add,
+                                  color: Color(0xFFA295D5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// 순서 변경 모달
+class _OrderChangeModal extends StatefulWidget {
+  final List<Record> records;
+  final List<Exercise> exercises;
+  final Function(List<Record>) onOrderChanged;
+  final Function(String) onDelete;
+
+  const _OrderChangeModal({
+    required this.records,
+    required this.exercises,
+    required this.onOrderChanged,
+    required this.onDelete,
+  });
+
+  @override
+  State<_OrderChangeModal> createState() => _OrderChangeModalState();
+}
+
+class _OrderChangeModalState extends State<_OrderChangeModal> {
+  late List<Record> orderedRecords;
+
+  @override
+  void initState() {
+    super.initState();
+    orderedRecords = List.from(widget.records);
+  }
+
+  String _getExerciseName(String exerciseId) {
+    final exercise = widget.exercises.firstWhere(
+      (e) => e.id == exerciseId,
+      orElse: () => Exercise(id: '', name: '알 수 없음', tag: ''),
+    );
+    return exercise.name;
+  }
+
+  String _getExerciseTag(String exerciseId) {
+    final exercise = widget.exercises.firstWhere(
+      (e) => e.id == exerciseId,
+      orElse: () => Exercise(id: '', name: '', tag: ''),
+    );
+    return exercise.tag;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '운동 순서 변경',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => widget.onOrderChanged(orderedRecords),
+                child: const Text(
+                  '완료',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFA295D5),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '드래그해서 순서를 변경하세요',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (orderedRecords.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: Text(
+                  '운동 기록이 없습니다',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ),
+            )
+          else
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              itemCount: orderedRecords.length,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex--;
+                  final item = orderedRecords.removeAt(oldIndex);
+                  orderedRecords.insert(newIndex, item);
+                });
+              },
+              itemBuilder: (context, index) {
+                final record = orderedRecords[index];
+                return Container(
+                  key: ValueKey(record.id),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        '#${index + 1}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _getExerciseName(record.exerciseId),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                            Text(
+                              _getExerciseTag(record.exerciseId),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => widget.onDelete(record.id),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFFEF4444),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.drag_handle,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// 성장률 상세 모달
+class _GrowthDetailModal extends StatelessWidget {
+  final Map<String, dynamic> routineGrowth;
+  final List<Exercise> exercises;
+  final String Function(String) formatDateStrKorean;
+
+  const _GrowthDetailModal({
+    required this.routineGrowth,
+    required this.exercises,
+    required this.formatDateStrKorean,
+  });
+
+  String _getExerciseName(String exerciseId) {
+    final exercise = exercises.firstWhere(
+      (e) => e.id == exerciseId,
+      orElse: () => Exercise(id: '', name: '알 수 없음', tag: ''),
+    );
+    return exercise.name;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final comparisons = routineGrowth['comparisons'] as List<Map<String, dynamic>>;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '성장률 상세',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: comparisons.length,
+              itemBuilder: (context, index) {
+                final comparison = comparisons[index];
+                final exerciseId = comparison['exerciseId'] as String;
+                final previousRecord = comparison['previousRecord'] as Record;
+                final previousVolume = comparison['previousVolume'] as double;
+                final growth = comparison['growth'] as double;
+
+                // 성장률에 따른 색상
+                Color textColor;
+                if (growth > 0) {
+                  textColor = const Color(0xFF2D9C61);
+                } else if (growth == 0) {
+                  textColor = const Color(0xFF847DC4);
+                } else {
+                  textColor = const Color(0xFFE75D7D);
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 운동 이름과 성장률
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getExerciseName(exerciseId),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1F2937),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'vs ${formatDateStrKorean(previousRecord.date)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // 과거 기록
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ...previousRecord.sets.asMap().entries.map((entry) {
+                              final setIndex = entry.key;
+                              final set = entry.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  '세트 ${setIndex + 1}: ${set.weight}kg × ${set.reps}회',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF374151),
+                                  ),
+                                ),
+                              );
+                            }),
+                            const SizedBox(height: 4),
+                            Text(
+                              '총 볼륨: ${previousVolume.toStringAsFixed(0)}kg',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 난이도 선택 모달
+class _DifficultyModal extends StatelessWidget {
+  final String exerciseName;
+  final String? currentDifficulty;
+  final String? previousDifficulty;
+  final Function(String?) onSelect;
+  final VoidCallback onDelete;
+
+  const _DifficultyModal({
+    required this.exerciseName,
+    required this.currentDifficulty,
+    required this.previousDifficulty,
+    required this.onSelect,
+    required this.onDelete,
+  });
+
+  Map<String, dynamic> _getDifficultyInfo(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return {'text': '쉬웠다', 'icon': Icons.sentiment_satisfied_alt};
+      case 'medium':
+        return {'text': '할만했다', 'icon': Icons.sentiment_neutral};
+      case 'hard':
+        return {'text': '겨우했다', 'icon': Icons.sentiment_very_dissatisfied};
+      default:
+        return {'text': '', 'icon': Icons.help_outline};
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                exerciseName,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              GestureDetector(
+                onTap: onDelete,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    Icons.remove_circle_outline,
+                    color: Color(0xFFC1BBC3),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 지난 난이도
+          Row(
+            children: [
+              const Text(
+                '지난 난이도: ',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              if (previousDifficulty != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getDifficultyInfo(previousDifficulty!)['icon'] as IconData,
+                        size: 16,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getDifficultyInfo(previousDifficulty!)['text'] as String,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else
+                const Text(
+                  '없음',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 난이도 선택 버튼들
+          ...['easy', 'medium', 'hard'].map((level) {
+            final info = _getDifficultyInfo(level);
+            final isSelected = currentDifficulty == level;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: () => onSelect(isSelected ? null : level),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFF3F1FA) : Colors.white,
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFFA295D5) : const Color(0xFFE5E7EB),
+                      width: isSelected ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        info['icon'] as IconData,
+                        size: 20,
+                        color: isSelected ? const Color(0xFFA295D5) : const Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        info['text'] as String,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: isSelected ? const Color(0xFFA295D5) : const Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// 개별 운동 히스토리 모달
+class _ExerciseHistoryModal extends StatelessWidget {
+  final String exerciseName;
+  final List<Record> history;
+  final String Function(String) formatDateStrKorean;
+
+  const _ExerciseHistoryModal({
+    required this.exerciseName,
+    required this.history,
+    required this.formatDateStrKorean,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$exerciseName 히스토리',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (history.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: Text(
+                  '기록이 없습니다',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: history.length,
+                itemBuilder: (context, index) {
+                  final record = history[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          formatDateStrKorean(record.date),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...record.sets.asMap().entries.map((entry) {
+                          final setIndex = entry.key;
+                          final set = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '세트 ${setIndex + 1}: ${set.weight}kg × ${set.reps}회',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 4),
+                        Text(
+                          '총 볼륨: ${record.totalVolume.toStringAsFixed(0)}kg',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
