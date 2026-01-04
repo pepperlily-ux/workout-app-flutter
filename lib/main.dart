@@ -7,6 +7,7 @@ import 'pages/calendar_page.dart';
 import 'pages/routine_page.dart';
 import 'pages/exercise_page.dart';
 import 'pages/splash_page.dart';
+import 'constants/app_colors.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,7 +21,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: '메타몽 과부하',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFA295D5)),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
         scaffoldBackgroundColor: Colors.white,
       ),
       home: const AppWrapper(),
@@ -77,12 +78,15 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     // 선택/비선택 색상
-    const selectedColor = Color(0xFFA295D5);
-    const unselectedColor = Color(0xFF6E6475);
+    const selectedColor = AppColors.primary;
+    const unselectedColor = AppColors.textMuted;
 
     // 각 탭에 해당하는 화면들
     final List<Widget> pages = [
-      HomePage(key: ValueKey(_selectedDate), initialDate: _selectedDate),
+      HomePage(
+        key: ValueKey(_selectedDate),
+        initialDate: _selectedDate,
+      ),
       CalendarPage(onDateSelect: _onCalendarDateSelect),
       const RoutinePage(),
       const ExercisePage(),
@@ -93,7 +97,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 1)), // 상단 테두리
+          border: Border(top: BorderSide(color: AppColors.border, width: 1)), // 상단 테두리
         ),
         child: SafeArea(
           child: Padding(

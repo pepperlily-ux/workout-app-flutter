@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/exercise.dart';
 import '../services/storage_service.dart';
+import '../constants/app_colors.dart';
 
 // 운동 화면
 class ExercisePage extends StatefulWidget {
@@ -44,9 +46,11 @@ class _ExercisePageState extends State<ExercisePage> {
     return _exercises.where((e) => e.tag == _selectedTag).toList();
   }
 
-  // 운동별 기록 횟수 가져오기
+  // 운동별 기록 횟수 가져오기 (볼륨이 0보다 큰 기록만)
   int _getRecordCount(String exerciseId) {
-    return _storage.getExerciseHistory(exerciseId).length;
+    return _storage.getExerciseHistory(exerciseId)
+        .where((r) => r.totalVolume > 0)
+        .length;
   }
 
   // 기존 태그 목록 가져오기
@@ -90,12 +94,12 @@ class _ExercisePageState extends State<ExercisePage> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F2937),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                    child: const Icon(Icons.close, color: AppColors.textTertiary),
                   ),
                 ],
               ),
@@ -107,7 +111,7 @@ class _ExercisePageState extends State<ExercisePage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -115,18 +119,18 @@ class _ExercisePageState extends State<ExercisePage> {
                 controller: nameController,
                 decoration: InputDecoration(
                   hintText: '예: 벤치프레스',
-                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  hintStyle: const TextStyle(color: AppColors.textHint),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                    borderSide: const BorderSide(color: AppColors.primary),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -142,7 +146,7 @@ class _ExercisePageState extends State<ExercisePage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -150,18 +154,18 @@ class _ExercisePageState extends State<ExercisePage> {
                 controller: tagController,
                 decoration: InputDecoration(
                   hintText: '예: 가슴, 등, 하체',
-                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  hintStyle: const TextStyle(color: AppColors.textHint),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                    borderSide: const BorderSide(color: AppColors.primary),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -197,13 +201,13 @@ class _ExercisePageState extends State<ExercisePage> {
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFFA295D5)
+                              ? AppColors.primary
                               : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
-                                ? const Color(0xFFA295D5)
-                                : const Color(0xFFE5E7EB),
+                                ? AppColors.primary
+                                : AppColors.border,
                           ),
                         ),
                         child: Text(
@@ -212,7 +216,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             fontSize: 14,
                             color: isSelected
                                 ? Colors.white
-                                : const Color(0xFF6B7280),
+                                : AppColors.textTertiary,
                           ),
                         ),
                       ),
@@ -263,7 +267,7 @@ class _ExercisePageState extends State<ExercisePage> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFA295D5),
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Center(
@@ -285,155 +289,205 @@ class _ExercisePageState extends State<ExercisePage> {
     );
   }
 
-  // 운동 상세/수정/삭제 모달
+  // 운동 클릭 시 히스토리 + 편집 아이콘 모달 (원본과 동일)
   void _showExerciseDetailModal(Exercise exercise) {
-    final recordCount = _getRecordCount(exercise.id);
+    // 볼륨이 0보다 큰 기록만 표시
+    final history = _storage.getExerciseHistory(exercise.id)
+        .where((r) => r.totalVolume > 0)
+        .toList();
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 헤더
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exercise.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFA295D5).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        exercise.tag,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFA295D5),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Color(0xFF6B7280)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 기록 횟수
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
+      builder: (modalContext) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 헤더: 운동 이름 + 태그 + 편집 아이콘
+              Row(
                 children: [
-                  const Icon(
-                    Icons.history,
-                    size: 20,
-                    color: Color(0xFF6B7280),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            exercise.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            exercise.tag,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '총 $recordCount회 기록',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
+                  // 편집 아이콘
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(modalContext);
+                      _showEditExerciseModal(exercise);
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: AppColors.textTertiary,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // 히스토리 보기 버튼
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showHistoryModal(exercise);
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFA295D5),
-                  side: const BorderSide(color: Color(0xFFA295D5)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('히스토리 보기'),
+              // 히스토리 목록
+              Expanded(
+                child: history.isNotEmpty
+                    ? ListView.builder(
+                        controller: scrollController,
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          final record = history[index];
+                          final dateParts = record.date.split('-');
+                          final dateStr = dateParts.length == 3
+                              ? '${dateParts[0]}년 ${int.parse(dateParts[1])}월 ${int.parse(dateParts[2])}일'
+                              : record.date;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.backgroundLight,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 날짜
+                                Text(
+                                  dateStr,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                // 세트 정보
+                                ...List.generate(
+                                  record.sets.length,
+                                  (setIndex) {
+                                    final set = record.sets[setIndex];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                '${setIndex + 1}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${set.weight ?? 0}kg × ${set.reps ?? 0}회',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: AppColors.textTertiary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 4),
+                                // 총 볼륨
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '총 ${record.totalVolume.toStringAsFixed(0)}kg',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.fitness_center,
+                              size: 48,
+                              color: Colors.grey[300],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '기록이 없습니다',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
-            ),
-            const SizedBox(height: 8),
-
-            // 수정/삭제 버튼
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showEditExerciseModal(exercise);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF6B7280),
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('수정'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showDeleteConfirmDialog(exercise);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFEF4444)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('삭제'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -473,12 +527,12 @@ class _ExercisePageState extends State<ExercisePage> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F2937),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                    child: const Icon(Icons.close, color: AppColors.textTertiary),
                   ),
                 ],
               ),
@@ -490,7 +544,7 @@ class _ExercisePageState extends State<ExercisePage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -498,18 +552,18 @@ class _ExercisePageState extends State<ExercisePage> {
                 controller: nameController,
                 decoration: InputDecoration(
                   hintText: '예: 벤치프레스',
-                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  hintStyle: const TextStyle(color: AppColors.textHint),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                    borderSide: const BorderSide(color: AppColors.primary),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -525,7 +579,7 @@ class _ExercisePageState extends State<ExercisePage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -533,18 +587,18 @@ class _ExercisePageState extends State<ExercisePage> {
                 controller: tagController,
                 decoration: InputDecoration(
                   hintText: '예: 가슴, 등, 하체',
-                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                  hintStyle: const TextStyle(color: AppColors.textHint),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                    borderSide: const BorderSide(color: AppColors.primary),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -580,13 +634,13 @@ class _ExercisePageState extends State<ExercisePage> {
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFFA295D5)
+                              ? AppColors.primary
                               : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
-                                ? const Color(0xFFA295D5)
-                                : const Color(0xFFE5E7EB),
+                                ? AppColors.primary
+                                : AppColors.border,
                           ),
                         ),
                         child: Text(
@@ -595,7 +649,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             fontSize: 14,
                             color: isSelected
                                 ? Colors.white
-                                : const Color(0xFF6B7280),
+                                : AppColors.textTertiary,
                           ),
                         ),
                       ),
@@ -651,7 +705,7 @@ class _ExercisePageState extends State<ExercisePage> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFA295D5),
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Center(
@@ -666,6 +720,77 @@ class _ExercisePageState extends State<ExercisePage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // 삭제 버튼
+              GestureDetector(
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('운동 삭제'),
+                      content: Text(
+                        '${exercise.name}을(를) 삭제하시겠습니까?\n관련 기록도 모두 삭제됩니다.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('취소'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                          ),
+                          child: const Text('삭제'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    // 운동 삭제
+                    final exercises = _storage.getExercises();
+                    exercises.removeWhere((e) => e.id == exercise.id);
+                    await _storage.saveExercises(exercises);
+
+                    // 관련 기록도 삭제
+                    final records = _storage.getRecords();
+                    records.removeWhere((r) => r.exerciseId == exercise.id);
+                    await _storage.saveRecords(records);
+
+                    setState(() {
+                      _exercises = _storage.getExercises();
+                    });
+
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${exercise.name} 삭제됨')),
+                      );
+                    }
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.error),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '운동 삭제',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -673,18 +798,18 @@ class _ExercisePageState extends State<ExercisePage> {
     );
   }
 
-  // 삭제 확인 다이얼로그
+  // 삭제 확인 다이얼로그 (리스트에서 바로 삭제)
   void _showDeleteConfirmDialog(Exercise exercise) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('운동 삭제'),
         content: Text(
           '${exercise.name}을(를) 삭제하시겠습니까?\n관련 기록도 모두 삭제됩니다.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('취소'),
           ),
           TextButton(
@@ -703,183 +828,19 @@ class _ExercisePageState extends State<ExercisePage> {
                 _exercises = _storage.getExercises();
               });
 
-              if (context.mounted) {
-                Navigator.pop(context);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('${exercise.name} 삭제됨')),
                 );
               }
             },
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFEF4444),
+              foregroundColor: AppColors.error,
             ),
             child: const Text('삭제'),
           ),
         ],
-      ),
-    );
-  }
-
-  // 히스토리 모달
-  void _showHistoryModal(Exercise exercise) {
-    final history = _storage.getExerciseHistory(exercise.id);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 헤더
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${exercise.name} 히스토리',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Color(0xFF6B7280)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              Expanded(
-                child: history.isNotEmpty
-                    ? ListView.builder(
-                        controller: scrollController,
-                        itemCount: history.length,
-                        itemBuilder: (context, index) {
-                          final record = history[index];
-                          final dateParts = record.date.split('-');
-                          final dateStr = dateParts.length == 3
-                              ? '${dateParts[0]}년 ${int.parse(dateParts[1])}월 ${int.parse(dateParts[2])}일'
-                              : record.date;
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 날짜
-                                Text(
-                                  dateStr,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                // 세트 정보
-                                ...List.generate(
-                                  record.sets.length,
-                                  (setIndex) {
-                                    final set = record.sets[setIndex];
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 24,
-                                            height: 24,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFA295D5)
-                                                  .withValues(alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                '${setIndex + 1}',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Color(0xFFA295D5),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${set.weight ?? 0}kg × ${set.reps ?? 0}회',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Color(0xFF6B7280),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 4),
-                                // 총 볼륨
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '총 ${record.totalVolume.toStringAsFixed(0)}kg',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFFA295D5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      )
-                    : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.fitness_center,
-                              size: 48,
-                              color: Colors.grey[300],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '아직 기록이 없습니다',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -899,7 +860,7 @@ class _ExercisePageState extends State<ExercisePage> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFA295D5),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -941,13 +902,13 @@ class _ExercisePageState extends State<ExercisePage> {
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFFA295D5)
+                              ? AppColors.primary
                               : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
-                                ? const Color(0xFFA295D5)
-                                : const Color(0xFFE5E7EB),
+                                ? AppColors.primary
+                                : AppColors.border,
                           ),
                         ),
                         child: Text(
@@ -956,7 +917,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             fontSize: 14,
                             color: isSelected
                                 ? Colors.white
-                                : const Color(0xFF6B7280),
+                                : AppColors.textTertiary,
                           ),
                         ),
                       ),
@@ -990,7 +951,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             '운동이 없습니다',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Color(0xFF9CA3AF),
+                              color: AppColors.textHint,
                             ),
                           ),
                         ],
@@ -1010,7 +971,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(color: AppColors.border),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1025,7 +986,7 @@ class _ExercisePageState extends State<ExercisePage> {
                                           style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w500,
-                                            color: Color(0xFF1F2937),
+                                            color: AppColors.textPrimary,
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -1038,7 +999,7 @@ class _ExercisePageState extends State<ExercisePage> {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFA295D5)
+                                          color: AppColors.primary
                                               .withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
@@ -1046,14 +1007,14 @@ class _ExercisePageState extends State<ExercisePage> {
                                           exercise.tag,
                                           style: const TextStyle(
                                             fontSize: 12,
-                                            color: Color(0xFFA295D5),
+                                            color: AppColors.primary,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                // 기록 횟수
+                                // 기록 횟수 + 삭제 아이콘
                                 Row(
                                   children: [
                                     if (recordCount > 0) ...[
@@ -1061,14 +1022,26 @@ class _ExercisePageState extends State<ExercisePage> {
                                         '$recordCount회',
                                         style: const TextStyle(
                                           fontSize: 14,
-                                          color: Color(0xFF9CA3AF),
+                                          color: AppColors.textHint,
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 8),
                                     ],
-                                    const Icon(
-                                      Icons.chevron_right,
-                                      color: Color(0xFF9CA3AF),
+                                    // 삭제 아이콘
+                                    GestureDetector(
+                                      onTap: () => _showDeleteConfirmDialog(exercise),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4),
+                                        child: SvgPicture.asset(
+                                          'assets/icons/remove.svg',
+                                          width: 20,
+                                          height: 20,
+                                          colorFilter: const ColorFilter.mode(
+                                            AppColors.iconBackground,
+                                            BlendMode.srcIn,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),

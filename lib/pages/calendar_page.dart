@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/record.dart';
 import '../models/exercise.dart';
 import '../services/storage_service.dart';
+import '../constants/app_colors.dart';
 
 // 캘린더 화면
 class CalendarPage extends StatefulWidget {
@@ -42,11 +43,11 @@ class _CalendarPageState extends State<CalendarPage> {
     return '${_currentMonth.year}-$month-$dayStr';
   }
 
-  // 해당 날짜의 기록 가져오기
+  // 해당 날짜의 기록 가져오기 (볼륨이 0보다 큰 것만)
   List<Record> _getRecordsForDate(int day) {
     final dateStr = _formatDate(day);
     return _records
-        .where((r) => r.date == dateStr && r.sets.isNotEmpty)
+        .where((r) => r.date == dateStr && r.totalVolume > 0)
         .toList();
   }
 
@@ -55,14 +56,14 @@ class _CalendarPageState extends State<CalendarPage> {
     return _getRecordsForDate(day).isNotEmpty;
   }
 
-  // 이번 달 운동 횟수 계산 (날짜 기준)
+  // 이번 달 운동 횟수 계산 (날짜 기준, 볼륨이 0보다 큰 기록만)
   int getMonthWorkoutCount() {
     final year = _currentMonth.year;
     final month = _currentMonth.month;
 
     final datesWithWorkouts = <String>{};
     for (final record in _records) {
-      if (record.sets.isNotEmpty) {
+      if (record.totalVolume > 0) {
         final recordDate = DateTime.tryParse(record.date);
         if (recordDate != null &&
             recordDate.year == year &&
@@ -145,8 +146,8 @@ class _CalendarPageState extends State<CalendarPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F1FA),
-                  border: Border.all(color: const Color(0xFFD4CDEB)),
+                  color: AppColors.primaryBackground,
+                  border: Border.all(color: AppColors.primaryBorder),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text.rich(
@@ -154,19 +155,19 @@ class _CalendarPageState extends State<CalendarPage> {
                     children: [
                       const TextSpan(
                         text: '이번달은 ',
-                        style: TextStyle(fontSize: 14, color: Color(0xFF374151)),
+                        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                       ),
                       TextSpan(
                         text: '$monthWorkoutCount번',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFA295D5),
+                          color: AppColors.primary,
                         ),
                       ),
                       const TextSpan(
                         text: ' 헬스장에 갔습니다',
-                        style: TextStyle(fontSize: 14, color: Color(0xFF374151)),
+                        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -184,7 +185,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     onTap: _previousMonth,
                     child: const Padding(
                       padding: EdgeInsets.all(8),
-                      child: Icon(Icons.chevron_left, size: 24, color: Color(0xFF3F4146)),
+                      child: Icon(Icons.chevron_left, size: 24, color: AppColors.divider),
                     ),
                   ),
                   Text(
@@ -192,14 +193,14 @@ class _CalendarPageState extends State<CalendarPage> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   GestureDetector(
                     onTap: _nextMonth,
                     child: const Padding(
                       padding: EdgeInsets.all(8),
-                      child: Icon(Icons.chevron_right, size: 24, color: Color(0xFF3F4146)),
+                      child: Icon(Icons.chevron_right, size: 24, color: AppColors.divider),
                     ),
                   ),
                 ],
@@ -259,16 +260,16 @@ class _CalendarPageState extends State<CalendarPage> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFFA295D5)
+                            ? AppColors.primary
                             : hasRecords
-                                ? const Color(0xFFF3F1FA)
+                                ? AppColors.primaryBackground
                                 : Colors.transparent,
                         border: Border.all(
                           color: isSelected
-                              ? const Color(0xFFA295D5)
+                              ? AppColors.primary
                               : hasRecords
-                                  ? const Color(0xFFD4CDEB)
-                                  : const Color(0xFFE5E7EB),
+                                  ? AppColors.primaryBorder
+                                  : AppColors.border,
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -281,14 +282,14 @@ class _CalendarPageState extends State<CalendarPage> {
                               fontSize: 14,
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF1F2937),
+                                  : AppColors.textPrimary,
                             ),
                           ),
                           if (hasRecords && !isSelected) ...[
                             const SizedBox(height: 2),
                             const Text(
                               '●',
-                              style: TextStyle(fontSize: 10, color: Color(0xFFA295D5)),
+                              style: TextStyle(fontSize: 10, color: AppColors.primary),
                             ),
                           ],
                         ],
@@ -307,7 +308,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -318,7 +319,7 @@ class _CalendarPageState extends State<CalendarPage> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -349,7 +350,7 @@ class _CalendarPageState extends State<CalendarPage> {
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFA295D5),
+                              color: AppColors.primary,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Center(
@@ -384,7 +385,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                     const SizedBox(height: 16),
                                     const Text(
                                       '왜 운동 안하냐몽!?',
-                                      style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+                                      style: TextStyle(fontSize: 14, color: AppColors.textHint),
                                     ),
                                   ],
                                 ),
@@ -395,7 +396,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(vertical: 12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA295D5),
+                                    color: AppColors.primary,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Center(
@@ -443,7 +444,7 @@ class _WorkoutRecordCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -457,7 +458,7 @@ class _WorkoutRecordCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+                  color: AppColors.textPrimary,
                 ),
               ),
               Container(
@@ -468,7 +469,7 @@ class _WorkoutRecordCard extends StatelessWidget {
                 ),
                 child: Text(
                   tag,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
                 ),
               ),
             ],
@@ -479,7 +480,7 @@ class _WorkoutRecordCard extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     '세트 ${entry.key + 1}: ${entry.value}',
-                    style: const TextStyle(fontSize: 14, color: Color(0xFF374151)),
+                    style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ),
               ),
@@ -489,7 +490,7 @@ class _WorkoutRecordCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF6B7280),
+              color: AppColors.textTertiary,
             ),
           ),
         ],

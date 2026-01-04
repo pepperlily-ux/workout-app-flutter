@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 
 // 커스텀 숫자 키보드 위젯
 class CustomKeyboard extends StatelessWidget {
@@ -138,7 +139,7 @@ class CustomKeyboard extends StatelessWidget {
           child: Container(
             height: 53,
             decoration: BoxDecoration(
-              color: const Color(0xFFA295D5),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(4),
             ),
             child: const Center(
@@ -202,7 +203,7 @@ class CustomKeyboard extends StatelessWidget {
                 '닫기',
                 style: TextStyle(
                   fontSize: 18,
-                  color: Color(0xFF9CA3AF),
+                  color: AppColors.textHint,
                   fontWeight: FontWeight.w400,
                 ),
               ),

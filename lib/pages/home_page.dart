@@ -6,12 +6,16 @@ import '../models/routine.dart';
 import '../models/workout_set.dart';
 import '../services/storage_service.dart';
 import '../widgets/custom_keyboard.dart';
+import '../constants/app_colors.dart';
 
 // 홈 화면
 class HomePage extends StatefulWidget {
   final String? initialDate; // 외부에서 전달받은 초기 날짜 (yyyy-MM-dd)
 
-  const HomePage({super.key, this.initialDate});
+  const HomePage({
+    super.key,
+    this.initialDate,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -32,6 +36,7 @@ class _HomePageState extends State<HomePage> {
   int? _activeSetIndex;
   String? _activeField; // 'weight' or 'reps'
   String _currentValue = '';
+  bool _isFirstInput = true; // 첫 입력 시 기존 값 덮어쓰기용
 
   @override
   void initState() {
@@ -43,6 +48,12 @@ class _HomePageState extends State<HomePage> {
       selectedDate = DateTime.now();
     }
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _removeKeyboardOverlay();
+    super.dispose();
   }
 
   // 데이터 불러오기
@@ -157,9 +168,38 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 세트 추가
+  // 세트 추가 - 원본 로직: 이전 운동 참조 → 오늘 마지막 세트 → 빈 세트
   Future<void> _addSet(Record record) async {
-    record.sets.add(WorkoutSet());
+    final nextSetIndex = record.sets.length;
+    WorkoutSet newSet;
+
+    // 1순위: 이전 운동 기록에서 같은 인덱스의 세트 가져오기
+    final history = _storage.getExerciseHistory(record.exerciseId);
+    final selectedDateStr = _formatDate(selectedDate);
+
+    // 오늘 이전의 가장 최근 기록 찾기
+    Record? previousRecord;
+    for (final r in history) {
+      if (r.date.compareTo(selectedDateStr) < 0 && r.totalVolume > 0) {
+        previousRecord = r;
+        break;
+      }
+    }
+
+    if (previousRecord != null && nextSetIndex < previousRecord.sets.length) {
+      // 이전 운동에 해당 인덱스 세트가 있으면 복사
+      final prevSet = previousRecord.sets[nextSetIndex];
+      newSet = WorkoutSet(weight: prevSet.weight, reps: prevSet.reps);
+    } else if (record.sets.isNotEmpty) {
+      // 2순위: 오늘 마지막 세트 복사
+      final lastSet = record.sets.last;
+      newSet = WorkoutSet(weight: lastSet.weight, reps: lastSet.reps);
+    } else {
+      // 3순위: 빈 세트
+      newSet = WorkoutSet();
+    }
+
+    record.sets.add(newSet);
     await _storage.updateRecord(record);
     setState(() {
       _loadDateRecords();
@@ -417,7 +457,10 @@ class _HomePageState extends State<HomePage> {
 
   // 개별 운동 히스토리 모달 표시
   void _showExerciseHistoryModal(String exerciseId, String exerciseName) {
-    final history = _storage.getExerciseHistory(exerciseId);
+    // 볼륨이 0보다 큰 기록만 표시
+    final history = _storage.getExerciseHistory(exerciseId)
+        .where((r) => r.totalVolume > 0)
+        .toList();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -462,7 +505,7 @@ class _HomePageState extends State<HomePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => _DifficultyModal(
+      builder: (modalContext) => _DifficultyModal(
         exerciseName: exerciseName,
         currentDifficulty: record.difficulty,
         previousDifficulty: previousDifficulty,
@@ -472,15 +515,17 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _loadDateRecords();
           });
-          if (mounted) Navigator.pop(context);
+          if (modalContext.mounted) Navigator.pop(modalContext);
         },
         onDelete: () async {
           await _deleteRecord(record.id);
-          if (mounted) Navigator.pop(context);
+          if (modalContext.mounted) Navigator.pop(modalContext);
         },
       ),
     );
   }
+
+  OverlayEntry? _keyboardOverlay;
 
   // 커스텀 키보드 표시
   void _showKeyboard(String recordId, int setIndex, String field, String initialValue) {
@@ -490,7 +535,35 @@ class _HomePageState extends State<HomePage> {
       _activeSetIndex = setIndex;
       _activeField = field;
       _currentValue = initialValue;
+      _isFirstInput = true; // 필드 전환 시 첫 입력 상태로 리셋
     });
+    _showKeyboardOverlay();
+  }
+
+  // 키보드 Overlay 표시
+  void _showKeyboardOverlay() {
+    _removeKeyboardOverlay();
+    _keyboardOverlay = OverlayEntry(
+      builder: (context) => Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: Material(
+          child: CustomKeyboard(
+            onKeyPressed: _handleKeyboardInput,
+            onNext: _moveToNextField,
+            onClose: _hideKeyboard,
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_keyboardOverlay!);
+  }
+
+  // 키보드 Overlay 제거
+  void _removeKeyboardOverlay() {
+    _keyboardOverlay?.remove();
+    _keyboardOverlay = null;
   }
 
   // 커스텀 키보드 숨기기
@@ -523,28 +596,53 @@ class _HomePageState extends State<HomePage> {
       _activeField = null;
       _currentValue = '';
     });
+    _removeKeyboardOverlay();
   }
+
+  // 입력 제한 상수
+  static const int _weightMax = 999;
+  static const int _repsMax = 99;
+  static const int _weightMaxLen = 5; // 999.9
+  static const int _repsMaxLen = 2;   // 99
 
   // 키보드 입력 처리
   void _handleKeyboardInput(String key) {
     setState(() {
+      // 숫자 키인지 확인
+      final isNumberKey = RegExp(r'^[0-9]$').hasMatch(key);
+
       if (key == 'backspace') {
         if (_currentValue.isNotEmpty) {
           _currentValue = _currentValue.substring(0, _currentValue.length - 1);
         }
+        _isFirstInput = false;
       } else if (key.startsWith('+') || key.startsWith('-')) {
         // 증감 연산
         final modifier = int.tryParse(key) ?? 0;
         final current = double.tryParse(_currentValue) ?? 0;
         final newValue = current + modifier;
-        if (newValue >= 0) {
+
+        // 최대값 제한 적용
+        final maxVal = _activeField == 'weight' ? _weightMax : _repsMax;
+        if (newValue >= 0 && newValue <= maxVal) {
           if (newValue == newValue.toInt()) {
             _currentValue = newValue.toInt().toString();
           } else {
             _currentValue = newValue.toString();
           }
         }
+        _isFirstInput = false;
       } else if (key == '.') {
+        // 횟수(reps)에는 소수점 입력 방지
+        if (_activeField == 'reps') return;
+
+        // 첫 입력 시 기존 값 지우고 "0."으로 시작
+        if (_isFirstInput && _currentValue.isNotEmpty) {
+          _currentValue = '0.';
+          _isFirstInput = false;
+          return;
+        }
+
         if (!_currentValue.contains('.')) {
           if (_currentValue.isEmpty) {
             _currentValue = '0.';
@@ -552,8 +650,36 @@ class _HomePageState extends State<HomePage> {
             _currentValue += '.';
           }
         }
-      } else {
+        _isFirstInput = false;
+      } else if (isNumberKey) {
+        // 첫 입력이고 기존 값이 있으면 덮어쓰기
+        if (_isFirstInput && _currentValue.isNotEmpty && _currentValue != '0') {
+          // 최대값 체크
+          final newValue = double.tryParse(key);
+          if (newValue != null) {
+            final maxVal = _activeField == 'weight' ? _weightMax : _repsMax;
+            if (newValue <= maxVal) {
+              _currentValue = key;
+            }
+          }
+          _isFirstInput = false;
+          return;
+        }
+
+        // 글자 수 제한 체크
+        final maxLen = _activeField == 'weight' ? _weightMaxLen : _repsMaxLen;
+        if (_currentValue.length >= maxLen) return;
+
+        // 새 값 미리 계산해서 최대값 체크
+        final newValueStr = _currentValue + key;
+        final newValue = double.tryParse(newValueStr);
+        if (newValue != null) {
+          final maxVal = _activeField == 'weight' ? _weightMax : _repsMax;
+          if (newValue > maxVal) return;
+        }
+
         _currentValue += key;
+        _isFirstInput = false;
       }
 
       // 실시간으로 값 업데이트
@@ -638,7 +764,7 @@ class _HomePageState extends State<HomePage> {
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1F2937),
+                                    color: AppColors.textPrimary,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -649,7 +775,7 @@ class _HomePageState extends State<HomePage> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA295D5).withValues(alpha: 0.1),
+                                    color: AppColors.primary.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text(
@@ -657,7 +783,7 @@ class _HomePageState extends State<HomePage> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFFA295D5),
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 )
@@ -667,7 +793,7 @@ class _HomePageState extends State<HomePage> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF3F4F6),
+                                      color: AppColors.backgroundGrey,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: const Text(
@@ -675,7 +801,7 @@ class _HomePageState extends State<HomePage> {
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: Color(0xFF9CA3AF),
+                                        color: AppColors.textHint,
                                       ),
                                     ),
                                   ),
@@ -695,7 +821,7 @@ class _HomePageState extends State<HomePage> {
                                   width: 24,
                                   height: 24,
                                   colorFilter: const ColorFilter.mode(
-                                    Color(0xFF6E6475),
+                                    AppColors.textMuted,
                                     BlendMode.srcIn,
                                   ),
                                 ),
@@ -708,7 +834,7 @@ class _HomePageState extends State<HomePage> {
                                 child: Icon(
                                   Icons.menu,
                                   size: 24,
-                                  color: Color(0xFF6E6475),
+                                  color: AppColors.textMuted,
                                 ),
                               ),
                             ),
@@ -735,17 +861,17 @@ class _HomePageState extends State<HomePage> {
                     Color textColor;
 
                     if (growth > 0) {
-                      bgColor = const Color(0xFFFAFFFB);
-                      borderColor = const Color(0xFF78D2A8);
-                      textColor = const Color(0xFF2D9C61);
+                      bgColor = AppColors.successBackground;
+                      borderColor = AppColors.successLight;
+                      textColor = AppColors.success;
                     } else if (growth == 0) {
-                      bgColor = const Color(0xFFF3F1FA);
-                      borderColor = const Color(0xFFD4CDEB);
-                      textColor = const Color(0xFF847DC4);
+                      bgColor = AppColors.primaryBackground;
+                      borderColor = AppColors.primaryBorder;
+                      textColor = AppColors.primaryDark;
                     } else {
-                      bgColor = const Color(0xFFFFF9FA);
-                      borderColor = const Color(0xFFF06B8A).withValues(alpha: 0.8);
-                      textColor = const Color(0xFFE75D7D).withValues(alpha: 0.8);
+                      bgColor = AppColors.warningBackground;
+                      borderColor = AppColors.warningLight.withValues(alpha: 0.8);
+                      textColor = AppColors.warning.withValues(alpha: 0.8);
                     }
 
                     return GestureDetector(
@@ -770,7 +896,7 @@ class _HomePageState extends State<HomePage> {
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF374151),
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -790,7 +916,7 @@ class _HomePageState extends State<HomePage> {
                               'vs ${previousDate != null ? _formatDateStrKorean(previousDate) : ''} · $commonCount개 운동 비교',
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF6B7280),
+                                color: AppColors.textTertiary,
                               ),
                             ),
                           ],
@@ -820,7 +946,7 @@ class _HomePageState extends State<HomePage> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.normal,
-                                color: Color(0xFF847DC4),
+                                color: AppColors.primaryDark,
                               ),
                             ),
                           ),
@@ -835,7 +961,7 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFA295D5),
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Center(
@@ -875,7 +1001,7 @@ class _HomePageState extends State<HomePage> {
                           '루틴을 선택하거나 운동을 추가하세요',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF9CA3AF),
+                            color: AppColors.textHint,
                           ),
                         ),
                       ],
@@ -916,18 +1042,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        // 커스텀 키보드
-        if (_isKeyboardVisible)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: CustomKeyboard(
-              onKeyPressed: _handleKeyboardInput,
-              onNext: _moveToNextField,
-              onClose: _hideKeyboard,
-            ),
-          ),
         ],
       ),
     );
@@ -980,7 +1094,7 @@ class _ExerciseCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
@@ -1005,7 +1119,7 @@ class _ExerciseCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -1056,7 +1170,7 @@ class _ExerciseCard extends StatelessWidget {
                       '세트 ${index + 1}',
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF9CA3AF),
+                        color: AppColors.textHint,
                       ),
                     ),
                   ),
@@ -1070,8 +1184,8 @@ class _ExerciseCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: isWeightActive
-                                ? const Color(0xFFA295D5)
-                                : const Color(0xFFD1D5DB),
+                                ? AppColors.primary
+                                : AppColors.borderLight,
                             width: isWeightActive ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(4),
@@ -1082,8 +1196,8 @@ class _ExerciseCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               color: weightDisplay.isEmpty
-                                  ? const Color(0xFF9CA3AF)
-                                  : const Color(0xFF1F2937),
+                                  ? AppColors.textHint
+                                  : AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -1093,7 +1207,7 @@ class _ExerciseCard extends StatelessWidget {
 
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Text('kg', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+                    child: Text('kg', style: TextStyle(color: AppColors.textHint, fontSize: 14)),
                   ),
 
                   // 횟수 입력 (커스텀 키보드용)
@@ -1105,8 +1219,8 @@ class _ExerciseCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: isRepsActive
-                                ? const Color(0xFFA295D5)
-                                : const Color(0xFFD1D5DB),
+                                ? AppColors.primary
+                                : AppColors.borderLight,
                             width: isRepsActive ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(4),
@@ -1117,8 +1231,8 @@ class _ExerciseCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               color: repsDisplay.isEmpty
-                                  ? const Color(0xFF9CA3AF)
-                                  : const Color(0xFF1F2937),
+                                  ? AppColors.textHint
+                                  : AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -1128,7 +1242,7 @@ class _ExerciseCard extends StatelessWidget {
 
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Text('회', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+                    child: Text('회', style: TextStyle(color: AppColors.textHint, fontSize: 14)),
                   ),
 
                   // 체크 버튼
@@ -1138,16 +1252,16 @@ class _ExerciseCard extends StatelessWidget {
                       width: 34,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: isChecked ? const Color(0xFFA295D5) : Colors.white,
+                        color: isChecked ? AppColors.primary : Colors.white,
                         border: Border.all(
-                          color: isChecked ? const Color(0xFFA295D5) : const Color(0xFFD1D5DB),
+                          color: isChecked ? AppColors.primary : AppColors.borderLight,
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Icon(
                         Icons.check,
                         size: 20,
-                        color: isChecked ? Colors.white : const Color(0xFFE5E7EB),
+                        color: isChecked ? Colors.white : AppColors.border,
                       ),
                     ),
                   ),
@@ -1167,7 +1281,7 @@ class _ExerciseCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                      border: Border.all(color: AppColors.borderLight),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Center(
@@ -1176,8 +1290,8 @@ class _ExerciseCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           color: record.sets.isEmpty
-                              ? const Color(0xFFD1D5DB)
-                              : const Color(0xFF6B7280),
+                              ? AppColors.borderLight
+                              : AppColors.textTertiary,
                         ),
                       ),
                     ),
@@ -1191,7 +1305,7 @@ class _ExerciseCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                      border: Border.all(color: AppColors.borderLight),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Center(
@@ -1199,7 +1313,7 @@ class _ExerciseCard extends StatelessWidget {
                         '추가',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF6B7280),
+                          color: AppColors.textTertiary,
                         ),
                       ),
                     ),
@@ -1217,22 +1331,22 @@ class _ExerciseCard extends StatelessWidget {
   Map<String, dynamic> _getDifficultyInfo(String difficulty) {
     switch (difficulty) {
       case 'easy':
-        return {'text': '쉬웠다', 'icon': Icons.sentiment_satisfied_alt};
+        return {'text': '쉬웠다', 'icon': 'assets/icons/face_easy.svg'};
       case 'medium':
-        return {'text': '할만했다', 'icon': Icons.sentiment_neutral};
+        return {'text': '할만했다', 'icon': 'assets/icons/face_medium.svg'};
       case 'hard':
-        return {'text': '겨우했다', 'icon': Icons.sentiment_very_dissatisfied};
+        return {'text': '겨우했다', 'icon': 'assets/icons/face_hard.svg'};
       default:
-        return {'text': '', 'icon': Icons.help_outline};
+        return {'text': '', 'icon': ''};
     }
   }
 
   Widget _buildDifficultyBadge(String difficulty, {required bool isCurrentSelected}) {
     final info = _getDifficultyInfo(difficulty);
-    final color = isCurrentSelected ? const Color(0xFFA295D5) : const Color(0xFF9CA3AF);
+    final color = isCurrentSelected ? AppColors.primary : AppColors.textHint;
     final bgColor = isCurrentSelected
-        ? const Color(0xFFA295D5).withValues(alpha: 0.1)
-        : const Color(0xFF9CA3AF).withValues(alpha: 0.1);
+        ? AppColors.primary.withValues(alpha: 0.1)
+        : AppColors.textHint.withValues(alpha: 0.1);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1243,7 +1357,12 @@ class _ExerciseCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(info['icon'] as IconData, size: 16, color: color),
+          SvgPicture.asset(
+            info['icon'] as String,
+            width: 16,
+            height: 16,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          ),
           const SizedBox(width: 4),
           Text(
             info['text'] as String,
@@ -1263,17 +1382,17 @@ class _ExerciseCard extends StatelessWidget {
     Color textColor;
 
     if (growth > 0) {
-      bgColor = const Color(0xFFFAFFFB);
-      borderColor = const Color(0xFF78D2A8).withValues(alpha: 0.5);
-      textColor = const Color(0xFF2D9C61);
+      bgColor = AppColors.successBackground;
+      borderColor = AppColors.successLight.withValues(alpha: 0.5);
+      textColor = AppColors.success;
     } else if (growth == 0) {
-      bgColor = const Color(0xFFF3F1FA);
-      borderColor = const Color(0xFFD4CDEB).withValues(alpha: 0.5);
-      textColor = const Color(0xFF847DC4);
+      bgColor = AppColors.primaryBackground;
+      borderColor = AppColors.primaryBorder.withValues(alpha: 0.5);
+      textColor = AppColors.primaryDark;
     } else {
-      bgColor = const Color(0xFFFFF9FA);
-      borderColor = const Color(0xFFF06B8A).withValues(alpha: 0.5);
-      textColor = const Color(0xFFE75D7D);
+      bgColor = AppColors.warningBackground;
+      borderColor = AppColors.warningLight.withValues(alpha: 0.5);
+      textColor = AppColors.warning;
     }
 
     return Container(
@@ -1330,7 +1449,7 @@ class _RoutineSelectModal extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -1342,7 +1461,7 @@ class _RoutineSelectModal extends StatelessWidget {
                   '저장된 루틴이 없습니다',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF9CA3AF),
+                    color: AppColors.textHint,
                   ),
                 ),
               ),
@@ -1356,7 +1475,7 @@ class _RoutineSelectModal extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                  border: Border.all(color: AppColors.borderLight),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -1367,7 +1486,7 @@ class _RoutineSelectModal extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1375,7 +1494,7 @@ class _RoutineSelectModal extends StatelessWidget {
                       _getExerciseNames(routine.exerciseIds),
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF6B7280),
+                        color: AppColors.textTertiary,
                       ),
                     ),
                   ],
@@ -1436,7 +1555,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+                  color: AppColors.textPrimary,
                 ),
               ),
               GestureDetector(
@@ -1449,7 +1568,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                   isAddingNew ? '취소' : '+ 새 운동',
                   style: const TextStyle(
                     fontSize: 14,
-                    color: Color(0xFFA295D5),
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1491,7 +1610,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFA295D5),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -1518,12 +1637,12 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: selectedTag == tag
-                            ? const Color(0xFFA295D5)
+                            ? AppColors.primary
                             : Colors.white,
                         border: Border.all(
                           color: selectedTag == tag
-                              ? const Color(0xFFA295D5)
-                              : const Color(0xFFD1D5DB),
+                              ? AppColors.primary
+                              : AppColors.borderLight,
                         ),
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -1533,7 +1652,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                           fontSize: 14,
                           color: selectedTag == tag
                               ? Colors.white
-                              : const Color(0xFF6B7280),
+                              : AppColors.textTertiary,
                         ),
                       ),
                     ),
@@ -1551,7 +1670,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                         '등록된 운동이 없습니다',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF9CA3AF),
+                          color: AppColors.textHint,
                         ),
                       ),
                     )
@@ -1566,7 +1685,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(color: AppColors.border),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -1580,7 +1699,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w500,
-                                          color: Color(0xFF1F2937),
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 2),
@@ -1588,7 +1707,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                                         exercise.tag,
                                         style: const TextStyle(
                                           fontSize: 12,
-                                          color: Color(0xFF9CA3AF),
+                                          color: AppColors.textHint,
                                         ),
                                       ),
                                     ],
@@ -1596,7 +1715,7 @@ class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
                                 ),
                                 const Icon(
                                   Icons.add,
-                                  color: Color(0xFFA295D5),
+                                  color: AppColors.primary,
                                 ),
                               ],
                             ),
@@ -1671,7 +1790,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+                  color: AppColors.textPrimary,
                 ),
               ),
               GestureDetector(
@@ -1680,7 +1799,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                   '완료',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFFA295D5),
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1692,7 +1811,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
             '드래그해서 순서를 변경하세요',
             style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF6B7280),
+              color: AppColors.textTertiary,
             ),
           ),
           const SizedBox(height: 16),
@@ -1704,7 +1823,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                   '운동 기록이 없습니다',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF9CA3AF),
+                    color: AppColors.textHint,
                   ),
                 ),
               ),
@@ -1727,7 +1846,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF9FAFB),
+                    color: AppColors.backgroundLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1736,7 +1855,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                         '#${index + 1}',
                         style: const TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF9CA3AF),
+                          color: AppColors.textHint,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1749,14 +1868,14 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF1F2937),
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             Text(
                               _getExerciseTag(record.exerciseId),
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF9CA3AF),
+                                color: AppColors.textHint,
                               ),
                             ),
                           ],
@@ -1766,14 +1885,14 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                         onTap: () => widget.onDelete(record.id),
                         child: const Icon(
                           Icons.delete_outline,
-                          color: Color(0xFFEF4444),
+                          color: AppColors.error,
                           size: 20,
                         ),
                       ),
                       const SizedBox(width: 8),
                       const Icon(
                         Icons.drag_handle,
-                        color: Color(0xFF9CA3AF),
+                        color: AppColors.textHint,
                       ),
                     ],
                   ),
@@ -1824,7 +1943,7 @@ class _GrowthDetailModal extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -1842,11 +1961,11 @@ class _GrowthDetailModal extends StatelessWidget {
                 // 성장률에 따른 색상
                 Color textColor;
                 if (growth > 0) {
-                  textColor = const Color(0xFF2D9C61);
+                  textColor = AppColors.success;
                 } else if (growth == 0) {
-                  textColor = const Color(0xFF847DC4);
+                  textColor = AppColors.primaryDark;
                 } else {
-                  textColor = const Color(0xFFE75D7D);
+                  textColor = AppColors.warning;
                 }
 
                 return Container(
@@ -1854,7 +1973,7 @@ class _GrowthDetailModal extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -1874,7 +1993,7 @@ class _GrowthDetailModal extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1F2937),
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -1882,7 +2001,7 @@ class _GrowthDetailModal extends StatelessWidget {
                                   'vs ${formatDateStrKorean(previousRecord.date)}',
                                   style: const TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF6B7280),
+                                    color: AppColors.textTertiary,
                                   ),
                                 ),
                               ],
@@ -1903,7 +2022,7 @@ class _GrowthDetailModal extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF9FAFB),
+                          color: AppColors.backgroundLight,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
@@ -1918,7 +2037,7 @@ class _GrowthDetailModal extends StatelessWidget {
                                   '세트 ${setIndex + 1}: ${set.weight}kg × ${set.reps}회',
                                   style: const TextStyle(
                                     fontSize: 14,
-                                    color: Color(0xFF374151),
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               );
@@ -1929,7 +2048,7 @@ class _GrowthDetailModal extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF6B7280),
+                                color: AppColors.textTertiary,
                               ),
                             ),
                           ],
@@ -1966,13 +2085,13 @@ class _DifficultyModal extends StatelessWidget {
   Map<String, dynamic> _getDifficultyInfo(String difficulty) {
     switch (difficulty) {
       case 'easy':
-        return {'text': '쉬웠다', 'icon': Icons.sentiment_satisfied_alt};
+        return {'text': '쉬웠다', 'icon': 'assets/icons/face_easy.svg'};
       case 'medium':
-        return {'text': '할만했다', 'icon': Icons.sentiment_neutral};
+        return {'text': '할만했다', 'icon': 'assets/icons/face_medium.svg'};
       case 'hard':
-        return {'text': '겨우했다', 'icon': Icons.sentiment_very_dissatisfied};
+        return {'text': '겨우했다', 'icon': 'assets/icons/face_hard.svg'};
       default:
-        return {'text': '', 'icon': Icons.help_outline};
+        return {'text': '', 'icon': ''};
     }
   }
 
@@ -1993,17 +2112,21 @@ class _DifficultyModal extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+                  color: AppColors.textPrimary,
                 ),
               ),
               GestureDetector(
                 onTap: onDelete,
                 child: Container(
                   padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    Icons.remove_circle_outline,
-                    color: Color(0xFFC1BBC3),
-                    size: 20,
+                  child: SvgPicture.asset(
+                    'assets/icons/remove.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.iconBackground,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
               ),
@@ -2018,7 +2141,7 @@ class _DifficultyModal extends StatelessWidget {
                 '지난 난이도: ',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF6B7280),
+                  color: AppColors.textTertiary,
                 ),
               ),
               if (previousDifficulty != null) ...[
@@ -2026,23 +2149,27 @@ class _DifficultyModal extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        _getDifficultyInfo(previousDifficulty!)['icon'] as IconData,
-                        size: 16,
-                        color: const Color(0xFF9CA3AF),
+                      SvgPicture.asset(
+                        _getDifficultyInfo(previousDifficulty!)['icon'] as String,
+                        width: 16,
+                        height: 16,
+                        colorFilter: const ColorFilter.mode(
+                          AppColors.textHint,
+                          BlendMode.srcIn,
+                        ),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         _getDifficultyInfo(previousDifficulty!)['text'] as String,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF9CA3AF),
+                          color: AppColors.textHint,
                         ),
                       ),
                     ],
@@ -2053,7 +2180,7 @@ class _DifficultyModal extends StatelessWidget {
                   '없음',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF9CA3AF),
+                    color: AppColors.textHint,
                   ),
                 ),
             ],
@@ -2073,19 +2200,23 @@ class _DifficultyModal extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFF3F1FA) : Colors.white,
+                    color: isSelected ? AppColors.primaryBackground : Colors.white,
                     border: Border.all(
-                      color: isSelected ? const Color(0xFFA295D5) : const Color(0xFFE5E7EB),
+                      color: isSelected ? AppColors.primary : AppColors.border,
                       width: isSelected ? 2 : 1,
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        info['icon'] as IconData,
-                        size: 20,
-                        color: isSelected ? const Color(0xFFA295D5) : const Color(0xFF6B7280),
+                      SvgPicture.asset(
+                        info['icon'] as String,
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(
+                          isSelected ? AppColors.primary : AppColors.textTertiary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Text(
@@ -2093,7 +2224,7 @@ class _DifficultyModal extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: isSelected ? const Color(0xFFA295D5) : const Color(0xFF6B7280),
+                          color: isSelected ? AppColors.primary : AppColors.textTertiary,
                         ),
                       ),
                     ],
@@ -2136,7 +2267,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -2148,7 +2279,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                   '기록이 없습니다',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF9CA3AF),
+                    color: AppColors.textHint,
                   ),
                 ),
               ),
@@ -2164,7 +2295,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF9FAFB),
+                      color: AppColors.backgroundLight,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -2175,7 +2306,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F2937),
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -2188,7 +2319,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                               '세트 ${setIndex + 1}: ${set.weight}kg × ${set.reps}회',
                               style: const TextStyle(
                                 fontSize: 14,
-                                color: Color(0xFF374151),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           );
@@ -2199,7 +2330,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B7280),
+                            color: AppColors.textTertiary,
                           ),
                         ),
                       ],

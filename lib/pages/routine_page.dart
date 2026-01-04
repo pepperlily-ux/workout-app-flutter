@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/routine.dart';
 import '../models/exercise.dart';
 import '../services/storage_service.dart';
+import '../constants/app_colors.dart';
 
 // 루틴 화면
 class RoutinePage extends StatefulWidget {
@@ -107,14 +109,14 @@ class _RoutinePageState extends State<RoutinePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소', style: TextStyle(color: Color(0xFF6B7280))),
+            child: const Text('취소', style: TextStyle(color: AppColors.textTertiary)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _deleteRoutine(routine.id);
             },
-            child: const Text('삭제', style: TextStyle(color: Color(0xFFEF4444))),
+            child: const Text('삭제', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -140,7 +142,7 @@ class _RoutinePageState extends State<RoutinePage> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -149,7 +151,7 @@ class _RoutinePageState extends State<RoutinePage> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 16),
@@ -162,7 +164,7 @@ class _RoutinePageState extends State<RoutinePage> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFA295D5),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -189,7 +191,7 @@ class _RoutinePageState extends State<RoutinePage> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                  border: Border.all(color: AppColors.borderLight),
                 ),
                 child: const Center(
                   child: Text(
@@ -197,7 +199,7 @@ class _RoutinePageState extends State<RoutinePage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF374151),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -272,11 +274,11 @@ class _RoutinePageState extends State<RoutinePage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소', style: TextStyle(color: Color(0xFF6B7280))),
+              child: const Text('취소', style: TextStyle(color: AppColors.textTertiary)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('가져오기', style: TextStyle(color: Color(0xFFA295D5))),
+              child: const Text('가져오기', style: TextStyle(color: AppColors.primary)),
             ),
           ],
         ),
@@ -339,7 +341,7 @@ class _RoutinePageState extends State<RoutinePage> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFA295D5),
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Center(
@@ -392,7 +394,7 @@ class _RoutinePageState extends State<RoutinePage> {
                     '데이터 관리',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.textHint,
                       decoration: TextDecoration.underline,
                     ),
                   ),
@@ -418,7 +420,7 @@ class _RoutinePageState extends State<RoutinePage> {
           const SizedBox(height: 16),
           const Text(
             '저장된 루틴이 없습니다',
-            style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+            style: TextStyle(fontSize: 14, color: AppColors.textHint),
           ),
         ],
       ),
@@ -432,7 +434,7 @@ class _RoutinePageState extends State<RoutinePage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -447,15 +449,19 @@ class _RoutinePageState extends State<RoutinePage> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 GestureDetector(
                   onTap: () => _showDeleteConfirm(routine),
-                  child: const Icon(
-                    Icons.remove_circle_outline,
-                    size: 20,
-                    color: Color(0xFFC1BBC3),
+                  child: SvgPicture.asset(
+                    'assets/icons/remove.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.iconBackground,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
               ],
@@ -471,14 +477,14 @@ class _RoutinePageState extends State<RoutinePage> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: AppColors.backgroundGrey,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
                     exercise.name,
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF374151),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 );
@@ -571,21 +577,21 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                  child: const Icon(Icons.close, color: AppColors.textTertiary),
                 ),
                 const Text(
                   '새 루틴 만들기',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -605,18 +611,18 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                     controller: _nameController,
                     decoration: InputDecoration(
                       hintText: '루틴 이름 (예: 하체 루틴)',
-                      hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                      hintStyle: const TextStyle(color: AppColors.textHint),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                        borderSide: const BorderSide(color: AppColors.borderLight),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                        borderSide: const BorderSide(color: AppColors.borderLight),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFA295D5)),
+                        borderSide: const BorderSide(color: AppColors.primary),
                       ),
                       contentPadding: const EdgeInsets.all(12),
                     ),
@@ -633,7 +639,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF374151),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       if (_selectedExercises.isNotEmpty)
@@ -641,7 +647,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                           '${_selectedExercises.length}개 선택됨',
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Color(0xFFA295D5),
+                            color: AppColors.primary,
                           ),
                         ),
                     ],
@@ -662,14 +668,14 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFFA295D5) : const Color(0xFFF3F4F6),
+                                color: isSelected ? AppColors.primary : AppColors.backgroundGrey,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
                                 tag,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: isSelected ? Colors.white : const Color(0xFF374151),
+                                  color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
                               ),
                             ),
@@ -690,7 +696,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                          border: Border.all(color: AppColors.border),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -699,9 +705,9 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                               width: 20,
                               height: 20,
                               decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFFA295D5) : Colors.white,
+                                color: isSelected ? AppColors.primary : Colors.white,
                                 border: Border.all(
-                                  color: isSelected ? const Color(0xFFA295D5) : const Color(0xFFD1D5DB),
+                                  color: isSelected ? AppColors.primary : AppColors.borderLight,
                                 ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
@@ -719,14 +725,14 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF1F2937),
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                   Text(
                                     exercise.tag,
                                     style: const TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF6B7280),
+                                      color: AppColors.textTertiary,
                                     ),
                                   ),
                                 ],
@@ -744,7 +750,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                       child: Center(
                         child: Text(
                           '이 태그의 운동이 없습니다',
-                          style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+                          style: TextStyle(fontSize: 14, color: AppColors.textHint),
                         ),
                       ),
                     ),
@@ -757,7 +763,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: GestureDetector(
               onTap: _handleSave,
@@ -765,7 +771,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFA295D5),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -869,21 +875,21 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                  child: const Icon(Icons.close, color: AppColors.textTertiary),
                 ),
                 Text(
                   '${widget.routine.name} 편집',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -904,7 +910,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF374151),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -915,7 +921,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                       child: Center(
                         child: Text(
                           '운동이 없습니다',
-                          style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+                          style: TextStyle(fontSize: 14, color: AppColors.textHint),
                         ),
                       ),
                     )
@@ -927,7 +933,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF9FAFB),
+                          color: AppColors.backgroundLight,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -941,14 +947,14 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF1F2937),
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                   Text(
                                     exercise.tag,
                                     style: const TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF6B7280),
+                                      color: AppColors.textTertiary,
                                     ),
                                   ),
                                 ],
@@ -956,10 +962,14 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                             ),
                             GestureDetector(
                               onTap: () => _removeExercise(id),
-                              child: const Icon(
-                                Icons.remove_circle_outline,
-                                size: 20,
-                                color: Color(0xFFEF4444),
+                              child: SvgPicture.asset(
+                                'assets/icons/remove.svg',
+                                width: 20,
+                                height: 20,
+                                colorFilter: const ColorFilter.mode(
+                                  AppColors.error,
+                                  BlendMode.srcIn,
+                                ),
                               ),
                             ),
                           ],
@@ -975,7 +985,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF374151),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -993,14 +1003,14 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFFA295D5) : const Color(0xFFF3F4F6),
+                                color: isSelected ? AppColors.primary : AppColors.backgroundGrey,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
                                 tag,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: isSelected ? Colors.white : const Color(0xFF374151),
+                                  color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
                               ),
                             ),
@@ -1022,7 +1032,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                          border: Border.all(color: AppColors.border),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
@@ -1033,14 +1043,14 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF1F2937),
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             Text(
                               exercise.tag,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF6B7280),
+                                color: AppColors.textTertiary,
                               ),
                             ),
                           ],
@@ -1055,7 +1065,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                       child: Center(
                         child: Text(
                           '추가할 운동이 없습니다',
-                          style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+                          style: TextStyle(fontSize: 14, color: AppColors.textHint),
                         ),
                       ),
                     ),
@@ -1068,7 +1078,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: GestureDetector(
               onTap: _handleSave,
@@ -1076,7 +1086,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFA295D5),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 
 class SplashPage extends StatefulWidget {
   final VoidCallback onComplete;
@@ -66,7 +67,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF847DC4),
+                            color: AppColors.primaryDark,
                             height: 1.36,
                           ),
                         ),
@@ -82,13 +83,13 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                         width: 203,
                         height: 203,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF3F1FA),
+                          color: AppColors.primaryBackground,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Icon(
                           Icons.fitness_center,
                           size: 80,
-                          color: Color(0xFFA295D5),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
