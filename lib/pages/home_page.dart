@@ -10,6 +10,12 @@ import '../constants/app_colors.dart';
 import 'exercise_select_page.dart';
 import 'routine_select_page.dart';
 
+// 숫자가 정수면 소수점 없이, 소수면 소수점으로 표시
+String formatWeight(double? value) {
+  if (value == null) return '';
+  return value % 1 == 0 ? value.toInt().toString() : value.toString();
+}
+
 // 홈 화면
 class HomePage extends StatefulWidget {
   final String? initialDate; // 외부에서 전달받은 초기 날짜 (yyyy-MM-dd)
@@ -36,6 +42,12 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _memoController = TextEditingController();
   final FocusNode _memoFocusNode = FocusNode();
 
+  // 스크롤 컨트롤러 (키보드 열릴 때 자동 스크롤용)
+  final ScrollController _scrollController = ScrollController();
+
+  // 각 운동 카드의 GlobalKey 저장 (스크롤 위치 계산용)
+  final Map<String, GlobalKey> _cardKeys = {};
+
   // 커스텀 키보드 상태
   bool _isKeyboardVisible = false;
   String? _activeRecordId;
@@ -61,6 +73,7 @@ class _HomePageState extends State<HomePage> {
     _removeKeyboardOverlay();
     _memoController.dispose();
     _memoFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -112,7 +125,7 @@ class _HomePageState extends State<HomePage> {
           const Text(
             '오늘의 메모',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
@@ -431,7 +444,7 @@ class _HomePageState extends State<HomePage> {
     return '${int.parse(parts[1])}월 ${int.parse(parts[2])}일';
   }
 
-  // 루틴 선택 페이지로 이동
+  // 루틴/날짜 불러오기 페이지로 이동
   void _showRoutineModal() {
     Navigator.push(
       context,
@@ -439,18 +452,21 @@ class _HomePageState extends State<HomePage> {
         builder: (context) => RoutineSelectPage(
           routines: routines,
           exercises: exercises,
+          storage: _storage,
           onSelect: (routine) {
             _selectRoutine(routine);
           },
-          onAddNew: (name, exerciseIds) async {
-            final newRoutine = Routine(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              name: name,
-              exerciseIds: exerciseIds,
-            );
-            routines.add(newRoutine);
-            await _storage.saveRoutines(routines);
-            setState(() {});
+          onSelectDateRecords: (records) async {
+            // 선택된 날짜의 기록들을 오늘 날짜에 추가
+            for (final record in records) {
+              final exercise = exercises.firstWhere(
+                (e) => e.id == record.exerciseId,
+                orElse: () => Exercise(id: '', name: '', tag: ''),
+              );
+              if (exercise.id.isNotEmpty) {
+                await _addExerciseToRecord(exercise);
+              }
+            }
           },
         ),
       ),
@@ -620,6 +636,38 @@ class _HomePageState extends State<HomePage> {
       _isFirstInput = true; // 필드 전환 시 첫 입력 상태로 리셋
     });
     _showKeyboardOverlay();
+    // 활성 필드로 스크롤
+    _scrollToActiveField(recordId);
+  }
+
+  // 활성 필드가 보이도록 스크롤
+  void _scrollToActiveField(String recordId) {
+    final key = _cardKeys[recordId];
+    if (key?.currentContext != null) {
+      // 약간의 딜레이 후 스크롤 (setState 완료 후)
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        final renderBox = key!.currentContext!.findRenderObject() as RenderBox?;
+        if (renderBox != null) {
+          final position = renderBox.localToGlobal(Offset.zero);
+          final cardHeight = renderBox.size.height;
+          final screenHeight = MediaQuery.of(context).size.height;
+          const keyboardHeight = 280.0; // 커스텀 키보드 높이
+          final visibleHeight = screenHeight - keyboardHeight;
+
+          // 카드가 키보드에 가려지는 경우 스크롤
+          if (position.dy + cardHeight > visibleHeight) {
+            final scrollOffset = _scrollController.offset +
+                (position.dy + cardHeight - visibleHeight) + 20; // 20px 여유
+            _scrollController.animateTo(
+              scrollOffset,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        }
+      });
+    }
   }
 
   // 키보드 Overlay 표시
@@ -1010,7 +1058,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 4),
                                 Text(
                                   '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%',
                                   style: TextStyle(
@@ -1052,7 +1100,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                           child: const Center(
                             child: Text(
-                              '루틴 선택',
+                              '불러오기',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.normal,
@@ -1118,7 +1166,12 @@ class _HomePageState extends State<HomePage> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    controller: _scrollController,
+                    // 키보드가 열려있을 때 하단에 키보드 높이만큼 패딩 추가
+                    padding: EdgeInsets.fromLTRB(
+                      16, 0, 16,
+                      _isKeyboardVisible ? 300 : 16, // 키보드 높이 + 여유
+                    ),
                     itemCount: dateRecords.length + 1, // +1 for memo
                     itemBuilder: (context, index) {
                       // 마지막 아이템은 메모 입력 영역
@@ -1130,9 +1183,14 @@ class _HomePageState extends State<HomePage> {
                       final growth = _calculateGrowth(record.exerciseId);
                       final exerciseName = _getExerciseName(record.exerciseId);
 
+                      // GlobalKey 생성 또는 재사용
+                      _cardKeys[record.id] ??= GlobalKey();
+
                       return _ExerciseCard(
+                        key: _cardKeys[record.id],
                         record: record,
                         exerciseName: exerciseName,
+                        exerciseIndex: index + 1,
                         growth: growth,
                         checkedSets: checkedSets,
                         onAddSet: () => _addSet(record),
@@ -1167,6 +1225,7 @@ class _HomePageState extends State<HomePage> {
 class _ExerciseCard extends StatelessWidget {
   final Record record;
   final String exerciseName;
+  final int exerciseIndex;
   final double? growth;
   final Map<String, bool> checkedSets;
   final VoidCallback onAddSet;
@@ -1184,8 +1243,10 @@ class _ExerciseCard extends StatelessWidget {
   final Function(int setIndex, String field, String initialValue) onFieldTap;
 
   const _ExerciseCard({
+    super.key,
     required this.record,
     required this.exerciseName,
+    required this.exerciseIndex,
     required this.growth,
     required this.checkedSets,
     required this.onAddSet,
@@ -1229,12 +1290,26 @@ class _ExerciseCard extends StatelessWidget {
               Expanded(
                 child: GestureDetector(
                   onTap: onNameTap,
-                  child: Text(
-                    exerciseName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$exerciseIndex ',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        TextSpan(
+                          text: exerciseName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1271,7 +1346,7 @@ class _ExerciseCard extends StatelessWidget {
             final isRepsActive = isKeyboardActive && activeSetIndex == index && activeField == 'reps';
 
             // 표시할 값 결정 (활성화된 필드면 currentValue, 아니면 저장된 값)
-            final weightDisplay = isWeightActive ? currentValue : (set.weight?.toString() ?? '');
+            final weightDisplay = isWeightActive ? currentValue : formatWeight(set.weight);
             final repsDisplay = isRepsActive ? currentValue : (set.reps?.toString() ?? '');
 
             return Padding(
@@ -1293,7 +1368,7 @@ class _ExerciseCard extends StatelessWidget {
                   // 무게 입력 (커스텀 키보드용)
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => onFieldTap(index, 'weight', set.weight?.toString() ?? ''),
+                      onTap: () => onFieldTap(index, 'weight', formatWeight(set.weight)),
                       child: Container(
                         height: 36,
                         decoration: BoxDecoration(
@@ -1322,7 +1397,7 @@ class _ExerciseCard extends StatelessWidget {
 
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Text('kg', style: TextStyle(color: AppColors.textHint, fontSize: 14)),
+                    child: Text('kg', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
                   ),
 
                   // 횟수 입력 (커스텀 키보드용)
@@ -1357,7 +1432,7 @@ class _ExerciseCard extends StatelessWidget {
 
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Text('회', style: TextStyle(color: AppColors.textHint, fontSize: 14)),
+                    child: Text('회', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
                   ),
 
                   // 체크 버튼
@@ -1483,6 +1558,7 @@ class _ExerciseCard extends StatelessWidget {
             info['text'] as String,
             style: TextStyle(
               fontSize: 12,
+              fontWeight: FontWeight.w500,
               color: color,
             ),
           ),
@@ -1520,8 +1596,8 @@ class _ExerciseCard extends StatelessWidget {
       child: Text(
         '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%',
         style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
           color: textColor,
         ),
       ),
@@ -1591,7 +1667,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
               const Text(
                 '운동 순서 변경',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
@@ -1749,7 +1825,7 @@ class _GrowthDetailModal extends StatelessWidget {
           const Text(
             '성장률 상세',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
@@ -1842,7 +1918,7 @@ class _GrowthDetailModal extends StatelessWidget {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Text(
-                                  '세트 ${setIndex + 1}: ${set.weight}kg × ${set.reps}회',
+                                  '세트 ${setIndex + 1}: ${formatWeight(set.weight)}kg × ${set.reps}회',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textSecondary,
@@ -1852,7 +1928,7 @@ class _GrowthDetailModal extends StatelessWidget {
                             }),
                             const SizedBox(height: 4),
                             Text(
-                              '총 볼륨: ${previousVolume.toStringAsFixed(0)}kg',
+                              '총 볼륨: ${formatWeight(previousVolume)}kg',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -2035,7 +2111,7 @@ class _DifficultyModal extends StatelessWidget {
                       Text(
                         info['text'] as String,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: isSelected ? AppColors.primary : AppColors.textTertiary,
                         ),
@@ -2083,7 +2159,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
           Text(
             '$exerciseName 히스토리',
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
@@ -2134,7 +2210,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text(
-                              '세트 ${setIndex + 1}: ${set.weight}kg × ${set.reps}회',
+                              '세트 ${setIndex + 1}: ${formatWeight(set.weight)}kg × ${set.reps}회',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,
@@ -2144,7 +2220,7 @@ class _ExerciseHistoryModal extends StatelessWidget {
                         }),
                         const SizedBox(height: 4),
                         Text(
-                          '총 볼륨: ${record.totalVolume.toStringAsFixed(0)}kg',
+                          '총 볼륨: ${formatWeight(record.totalVolume)}kg',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
