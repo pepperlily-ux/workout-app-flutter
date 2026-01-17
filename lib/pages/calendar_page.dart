@@ -279,7 +279,7 @@ class _CalendarPageState extends State<CalendarPage> {
                           Text(
                             '$day',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 12,
                               color: isSelected
                                   ? Colors.white
                                   : AppColors.textPrimary,
@@ -289,7 +289,7 @@ class _CalendarPageState extends State<CalendarPage> {
                             const SizedBox(height: 2),
                             const Text(
                               '●',
-                              style: TextStyle(fontSize: 10, color: AppColors.primary),
+                              style: TextStyle(fontSize: 12, height: 1.0, color: AppColors.primary),
                             ),
                           ],
                         ],
@@ -344,6 +344,43 @@ class _CalendarPageState extends State<CalendarPage> {
                             ),
                           );
                         }),
+                        // 메모 표시
+                        Builder(
+                          builder: (context) {
+                            final memo = _storage.getDailyMemo(_formatDate(_selectedDay!));
+                            if (memo == null || memo.isEmpty) return const SizedBox();
+                            return Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundLight,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '메모',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    memo,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                         GestureDetector(
                           onTap: _handleEditDate,
                           child: Container(

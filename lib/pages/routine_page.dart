@@ -71,6 +71,7 @@ class _RoutinePageState extends State<RoutinePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _CreateRoutineModal(
         exercises: _exercises,
@@ -87,6 +88,7 @@ class _RoutinePageState extends State<RoutinePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _EditRoutineModal(
         routine: routine,
@@ -127,14 +129,21 @@ class _RoutinePageState extends State<RoutinePage> {
   void _showDataModal() {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      builder: (context) => Builder(
+        builder: (context) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: 16 + MediaQuery.of(context).padding.bottom,
+          ),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
@@ -207,6 +216,7 @@ class _RoutinePageState extends State<RoutinePage> {
             ),
             const SizedBox(height: 16),
           ],
+        ),
         ),
       ),
     );
@@ -390,12 +400,23 @@ class _RoutinePageState extends State<RoutinePage> {
               child: Center(
                 child: GestureDetector(
                   onTap: _showDataModal,
-                  child: const Text(
-                    '데이터 관리',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textHint,
-                      decoration: TextDecoration.underline,
+                  child: Container(
+                    padding: const EdgeInsets.only(bottom: 1),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppColors.textHint,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: const Text(
+                      '데이터 관리',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.0,
+                        color: AppColors.textHint,
+                      ),
                     ),
                   ),
                 ),
@@ -447,8 +468,8 @@ class _RoutinePageState extends State<RoutinePage> {
                 Text(
                   routine.name,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -656,32 +677,50 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                   const SizedBox(height: 12),
 
                   // 태그 필터
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _tags.map((tag) {
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _tags.length,
+                      itemBuilder: (context, index) {
+                        final tag = _tags[index];
                         final isSelected = _selectedTag == tag;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedTag = tag),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppColors.primary : AppColors.backgroundGrey,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                tag,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedTag = tag),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.0,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.textTertiary,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         );
-                      }).toList(),
+                      },
                     ),
                   ),
 
@@ -717,22 +756,36 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Row(
                                 children: [
-                                  Text(
-                                    exercise.name,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.textPrimary,
+                                  Flexible(
+                                    child: Text(
+                                      exercise.name,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  Text(
-                                    exercise.tag,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textTertiary,
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      exercise.tag,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.0,
+                                        color: AppColors.primary,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -761,7 +814,12 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
 
           // 저장 버튼
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: 16 + MediaQuery.of(context).padding.bottom,
+            ),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
@@ -811,12 +869,20 @@ class _EditRoutineModal extends StatefulWidget {
 
 class _EditRoutineModalState extends State<_EditRoutineModal> {
   late List<String> _exerciseIds;
+  late TextEditingController _nameController;
   String _selectedTag = '전체';
 
   @override
   void initState() {
     super.initState();
     _exerciseIds = List.from(widget.routine.exerciseIds);
+    _nameController = TextEditingController(text: widget.routine.name);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
   }
 
   List<String> get _tags {
@@ -852,9 +918,15 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
   }
 
   void _handleSave() {
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('루틴 이름을 입력하세요')),
+      );
+      return;
+    }
     final updatedRoutine = Routine(
       id: widget.routine.id,
-      name: widget.routine.name,
+      name: _nameController.text.trim(),
       exerciseIds: _exerciseIds,
     );
     widget.onSave(updatedRoutine);
@@ -884,9 +956,9 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                   onTap: () => Navigator.pop(context),
                   child: const Icon(Icons.close, color: AppColors.textTertiary),
                 ),
-                Text(
-                  '${widget.routine.name} 편집',
-                  style: const TextStyle(
+                const Text(
+                  '루틴 편집',
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -904,6 +976,41 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 루틴 이름
+                  const Text(
+                    '루틴 이름',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      hintText: '루틴 이름을 입력하세요',
+                      hintStyle: const TextStyle(color: AppColors.textHint),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.primary),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
                   // 현재 운동 목록
                   const Text(
                     '현재 운동 목록',
@@ -991,32 +1098,50 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                   const SizedBox(height: 8),
 
                   // 태그 필터
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _tags.map((tag) {
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _tags.length,
+                      itemBuilder: (context, index) {
+                        final tag = _tags[index];
                         final isSelected = _selectedTag == tag;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedTag = tag),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppColors.primary : AppColors.backgroundGrey,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                tag,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedTag = tag),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.0,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.textTertiary,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         );
-                      }).toList(),
+                      },
                     ),
                   ),
 
@@ -1029,6 +1154,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                     return GestureDetector(
                       onTap: () => _addExercise(exercise.id),
                       child: Container(
+                        width: double.infinity,
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1076,7 +1202,12 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
 
           // 저장 버튼
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: 16 + MediaQuery.of(context).padding.bottom,
+            ),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: AppColors.border)),
             ),

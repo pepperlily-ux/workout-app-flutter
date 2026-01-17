@@ -7,6 +7,8 @@ import '../models/workout_set.dart';
 import '../services/storage_service.dart';
 import '../widgets/custom_keyboard.dart';
 import '../constants/app_colors.dart';
+import 'exercise_select_page.dart';
+import 'routine_select_page.dart';
 
 // 홈 화면
 class HomePage extends StatefulWidget {
@@ -29,6 +31,10 @@ class _HomePageState extends State<HomePage> {
   List<Exercise> exercises = [];
   List<Routine> routines = [];
   Map<String, bool> checkedSets = {};
+
+  // 메모 관련
+  final TextEditingController _memoController = TextEditingController();
+  final FocusNode _memoFocusNode = FocusNode();
 
   // 커스텀 키보드 상태
   bool _isKeyboardVisible = false;
@@ -53,6 +59,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _removeKeyboardOverlay();
+    _memoController.dispose();
+    _memoFocusNode.dispose();
     super.dispose();
   }
 
@@ -71,6 +79,73 @@ class _HomePageState extends State<HomePage> {
   void _loadDateRecords() {
     final dateStr = _formatDate(selectedDate);
     dateRecords = _storage.getRecordsByDate(dateStr);
+    // 메모 불러오기
+    _memoController.text = _storage.getDailyMemo(dateStr) ?? '';
+  }
+
+  // 메모 저장
+  Future<void> _saveMemo(String memo) async {
+    final dateStr = _formatDate(selectedDate);
+    await _storage.saveDailyMemo(dateStr, memo);
+  }
+
+  // 메모 섹션 위젯
+  Widget _buildMemoSection() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '오늘의 메모',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _memoController,
+            focusNode: _memoFocusNode,
+            maxLines: 3,
+            minLines: 2,
+            decoration: InputDecoration(
+              hintText: '오늘 운동에 대한 메모를 남겨보세요',
+              hintStyle: const TextStyle(
+                color: AppColors.textHint,
+                fontSize: 14,
+              ),
+              filled: true,
+              fillColor: AppColors.backgroundLight,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+            onChanged: _saveMemo,
+          ),
+        ],
+      ),
+    );
   }
 
   // 날짜 포맷 (yyyy-MM-dd)
@@ -356,55 +431,58 @@ class _HomePageState extends State<HomePage> {
     return '${int.parse(parts[1])}월 ${int.parse(parts[2])}일';
   }
 
-  // 루틴 선택 모달 표시
+  // 루틴 선택 페이지로 이동
   void _showRoutineModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => _RoutineSelectModal(
-        routines: routines,
-        exercises: exercises,
-        onSelect: (routine) {
-          Navigator.pop(context);
-          _selectRoutine(routine);
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RoutineSelectPage(
+          routines: routines,
+          exercises: exercises,
+          onSelect: (routine) {
+            _selectRoutine(routine);
+          },
+          onAddNew: (name, exerciseIds) async {
+            final newRoutine = Routine(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              name: name,
+              exerciseIds: exerciseIds,
+            );
+            routines.add(newRoutine);
+            await _storage.saveRoutines(routines);
+            setState(() {});
+          },
+        ),
       ),
     );
   }
 
-  // 운동 추가 모달 표시
+  // 운동 선택 페이지로 이동
   void _showExerciseModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (modalContext) => _ExerciseSelectModal(
-        exercises: exercises,
-        onSelect: (exercise) {
-          Navigator.pop(modalContext);
-          _addExerciseToRecord(exercise);
-        },
-        onAddNew: (name, tag) async {
-          final exercise = Exercise(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            name: name,
-            tag: tag,
-          );
-          await _storage.addExercise(exercise);
-          setState(() {
-            exercises = _storage.getExercises();
-          });
-          if (modalContext.mounted) {
-            Navigator.pop(modalContext);
-          }
-          _addExerciseToRecord(exercise);
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ExerciseSelectPage(
+          exercises: exercises,
+          storage: _storage,
+          onSelectMultiple: (selectedExercises) async {
+            for (final exercise in selectedExercises) {
+              await _addExerciseToRecord(exercise);
+            }
+          },
+          onAddNew: (name, tag) async {
+            final exercise = Exercise(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              name: name,
+              tag: tag,
+            );
+            await _storage.addExercise(exercise);
+            setState(() {
+              exercises = _storage.getExercises();
+            });
+            _addExerciseToRecord(exercise);
+          },
+        ),
       ),
     );
   }
@@ -414,6 +492,7 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -444,6 +523,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -465,6 +545,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -502,6 +583,7 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -543,19 +625,47 @@ class _HomePageState extends State<HomePage> {
   // 키보드 Overlay 표시
   void _showKeyboardOverlay() {
     _removeKeyboardOverlay();
+    // SafeArea 적용 전의 원본 viewPadding을 가져옴
+    final view = View.of(context);
+    final bottomPadding = MediaQueryData.fromView(view).viewPadding.bottom;
     _keyboardOverlay = OverlayEntry(
-      builder: (context) => Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: Material(
-          child: CustomKeyboard(
-            onKeyPressed: _handleKeyboardInput,
-            onNext: _moveToNextField,
-            onClose: _hideKeyboard,
-          ),
-        ),
-      ),
+      builder: (overlayContext) {
+        return Stack(
+          children: [
+            // 키보드 외부 영역 - 탭하면 키보드 닫기
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _hideKeyboard,
+                behavior: HitTestBehavior.opaque,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+            // 키보드 + 하단 패딩 영역
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Material(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CustomKeyboard(
+                      onKeyPressed: _handleKeyboardInput,
+                      onNext: _moveToNextField,
+                      onClose: _hideKeyboard,
+                    ),
+                    // 시스템 네비게이션 바 영역 (키보드와 같은 배경색)
+                    Container(
+                      height: bottomPadding,
+                      color: const Color(0xFFCCCCCC),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
     Overlay.of(context).insert(_keyboardOverlay!);
   }
@@ -894,7 +1004,7 @@ class _HomePageState extends State<HomePage> {
                                   child: Text(
                                     _getGrowthMessage(growth),
                                     style: const TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                       color: AppColors.textSecondary,
                                     ),
@@ -1009,8 +1119,13 @@ class _HomePageState extends State<HomePage> {
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    itemCount: dateRecords.length,
+                    itemCount: dateRecords.length + 1, // +1 for memo
                     itemBuilder: (context, index) {
+                      // 마지막 아이템은 메모 입력 영역
+                      if (index == dateRecords.length) {
+                        return _buildMemoSection();
+                      }
+
                       final record = dateRecords[index];
                       final growth = _calculateGrowth(record.exerciseId);
                       final exerciseName = _getExerciseName(record.exerciseId);
@@ -1414,323 +1529,6 @@ class _ExerciseCard extends StatelessWidget {
   }
 }
 
-// 루틴 선택 모달
-class _RoutineSelectModal extends StatelessWidget {
-  final List<Routine> routines;
-  final List<Exercise> exercises;
-  final Function(Routine) onSelect;
-
-  const _RoutineSelectModal({
-    required this.routines,
-    required this.exercises,
-    required this.onSelect,
-  });
-
-  String _getExerciseNames(List<String> exerciseIds) {
-    return exerciseIds.map((id) {
-      final exercise = exercises.firstWhere(
-        (e) => e.id == id,
-        orElse: () => Exercise(id: '', name: '', tag: ''),
-      );
-      return exercise.name;
-    }).where((name) => name.isNotEmpty).join(', ');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '루틴 선택',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (routines.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Text(
-                  '저장된 루틴이 없습니다',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textHint,
-                  ),
-                ),
-              ),
-            )
-          else
-            ...routines.map((routine) => GestureDetector(
-              onTap: () => onSelect(routine),
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.borderLight),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      routine.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getExerciseNames(routine.exerciseIds),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )),
-        ],
-      ),
-    );
-  }
-}
-
-// 운동 선택 모달
-class _ExerciseSelectModal extends StatefulWidget {
-  final List<Exercise> exercises;
-  final Function(Exercise) onSelect;
-  final Function(String name, String tag) onAddNew;
-
-  const _ExerciseSelectModal({
-    required this.exercises,
-    required this.onSelect,
-    required this.onAddNew,
-  });
-
-  @override
-  State<_ExerciseSelectModal> createState() => _ExerciseSelectModalState();
-}
-
-class _ExerciseSelectModalState extends State<_ExerciseSelectModal> {
-  String selectedTag = '전체';
-  bool isAddingNew = false;
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController tagController = TextEditingController();
-
-  List<String> get tags {
-    final tagSet = widget.exercises.map((e) => e.tag).toSet();
-    return ['전체', ...tagSet];
-  }
-
-  List<Exercise> get filteredExercises {
-    if (selectedTag == '전체') return widget.exercises;
-    return widget.exercises.where((e) => e.tag == selectedTag).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '운동 선택',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    isAddingNew = !isAddingNew;
-                  });
-                },
-                child: Text(
-                  isAddingNew ? '취소' : '+ 새 운동',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          if (isAddingNew) ...[
-            // 새 운동 추가 폼
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                hintText: '운동 이름',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: tagController,
-              decoration: InputDecoration(
-                hintText: '태그 (예: 가슴, 등, 하체)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (nameController.text.isNotEmpty && tagController.text.isNotEmpty) {
-                    widget.onAddNew(nameController.text, tagController.text);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('운동 추가'),
-              ),
-            ),
-          ] else ...[
-            // 태그 필터
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: tags.map((tag) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedTag = tag;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: selectedTag == tag
-                            ? AppColors.primary
-                            : Colors.white,
-                        border: Border.all(
-                          color: selectedTag == tag
-                              ? AppColors.primary
-                              : AppColors.borderLight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        tag,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: selectedTag == tag
-                              ? Colors.white
-                              : AppColors.textTertiary,
-                        ),
-                      ),
-                    ),
-                  ),
-                )).toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 운동 목록
-            Expanded(
-              child: filteredExercises.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '등록된 운동이 없습니다',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: filteredExercises.length,
-                      itemBuilder: (context, index) {
-                        final exercise = filteredExercises[index];
-                        return GestureDetector(
-                          onTap: () => widget.onSelect(exercise),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: AppColors.border),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        exercise.name,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        exercise.tag,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textHint,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.add,
-                                  color: AppColors.primary,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 // 순서 변경 모달
 class _OrderChangeModal extends StatefulWidget {
   final List<Record> records;
@@ -1777,7 +1575,12 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: 16 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1933,7 +1736,12 @@ class _GrowthDetailModal extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.7,
       ),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: 16 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2098,7 +1906,12 @@ class _DifficultyModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: 16 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2257,7 +2070,12 @@ class _ExerciseHistoryModal extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.7,
       ),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: 16 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

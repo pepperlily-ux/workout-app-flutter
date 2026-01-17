@@ -53,13 +53,6 @@ class _ExercisePageState extends State<ExercisePage> {
         .length;
   }
 
-  // 기존 태그 목록 가져오기
-  List<String> get _existingTags {
-    final tags = _exercises.map((e) => e.tag).toSet().toList();
-    tags.sort();
-    return tags;
-  }
-
   // 운동 추가 모달
   void _showAddExerciseModal() {
     final nameController = TextEditingController();
@@ -69,6 +62,7 @@ class _ExercisePageState extends State<ExercisePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -79,7 +73,7 @@ class _ExercisePageState extends State<ExercisePage> {
             left: 16,
             right: 16,
             top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -140,9 +134,9 @@ class _ExercisePageState extends State<ExercisePage> {
               ),
               const SizedBox(height: 16),
 
-              // 태그 입력
+              // 운동 종류 선택
               const Text(
-                '태그',
+                '운동 종류',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -150,10 +144,12 @@ class _ExercisePageState extends State<ExercisePage> {
                 ),
               ),
               const SizedBox(height: 8),
+
+              // 운동 종류 직접 입력
               TextField(
                 controller: tagController,
                 decoration: InputDecoration(
-                  hintText: '예: 가슴, 등, 하체',
+                  hintText: '예: 가슴, 등, 하체...',
                   hintStyle: const TextStyle(color: AppColors.textHint),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -174,58 +170,65 @@ class _ExercisePageState extends State<ExercisePage> {
                 ),
                 onChanged: (value) {
                   setModalState(() {
-                    selectedTag = null;
+                    selectedTag = value.trim().isEmpty ? null : value.trim();
                   });
                 },
               ),
               const SizedBox(height: 12),
 
-              // 기존 태그 목록
-              if (_existingTags.isNotEmpty) ...[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _existingTags.map((tag) {
-                    final isSelected = selectedTag == tag;
-                    return GestureDetector(
-                      onTap: () {
-                        setModalState(() {
-                          selectedTag = tag;
-                          tagController.text = tag;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
+              // 기존 태그 목록 (빠른 선택용)
+              Builder(
+                builder: (context) {
+                  // 기존 운동들에서 태그 추출 + 기본 태그
+                  final existingTags = _exercises.map((e) => e.tag).toSet();
+                  final defaultTags = {'등', '가슴', '하체', '어깨'};
+                  final allTags = {...defaultTags, ...existingTags}.toList()..sort();
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: allTags.map((tag) {
+                      final isSelected = selectedTag == tag;
+                      return GestureDetector(
+                        onTap: () {
+                          setModalState(() {
+                            selectedTag = tag;
+                            tagController.text = tag;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
                             color: isSelected
                                 ? AppColors.primary
-                                : AppColors.border,
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.border,
+                            ),
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.0,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textTertiary,
+                            ),
                           ),
                         ),
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isSelected
-                                ? Colors.white
-                                : AppColors.textTertiary,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-              ] else
-                const SizedBox(height: 12),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
 
               // 추가 버튼
               GestureDetector(
@@ -238,7 +241,7 @@ class _ExercisePageState extends State<ExercisePage> {
                   }
                   if (tagController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('태그를 입력하세요')),
+                      const SnackBar(content: Text('운동 종류를 입력하세요')),
                     );
                     return;
                   }
@@ -300,6 +303,7 @@ class _ExercisePageState extends State<ExercisePage> {
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -309,7 +313,12 @@ class _ExercisePageState extends State<ExercisePage> {
         maxChildSize: 0.9,
         expand: false,
         builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: 16 + MediaQuery.of(context).padding.bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -334,7 +343,7 @@ class _ExercisePageState extends State<ExercisePage> {
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 2,
+                            vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
@@ -344,6 +353,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             exercise.tag,
                             style: const TextStyle(
                               fontSize: 12,
+                              height: 1.0,
                               color: AppColors.primary,
                             ),
                           ),
@@ -380,12 +390,12 @@ class _ExercisePageState extends State<ExercisePage> {
                           final record = history[index];
                           final dateParts = record.date.split('-');
                           final dateStr = dateParts.length == 3
-                              ? '${dateParts[0]}년 ${int.parse(dateParts[1])}월 ${int.parse(dateParts[2])}일'
+                              ? '${int.parse(dateParts[1])}월 ${int.parse(dateParts[2])}일'
                               : record.date;
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: AppColors.backgroundLight,
                               borderRadius: BorderRadius.circular(8),
@@ -397,8 +407,8 @@ class _ExercisePageState extends State<ExercisePage> {
                                 Text(
                                   dateStr,
                                   style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
@@ -410,79 +420,41 @@ class _ExercisePageState extends State<ExercisePage> {
                                     final set = record.sets[setIndex];
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 4),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 24,
-                                            height: 24,
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary
-                                                  .withValues(alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                '${setIndex + 1}',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: AppColors.primary,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${set.weight ?? 0}kg × ${set.reps ?? 0}회',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: AppColors.textTertiary,
-                                            ),
-                                          ),
-                                        ],
+                                      child: Text(
+                                        '세트 ${setIndex + 1}: ${set.weight ?? 0}kg × ${set.reps ?? 0}회',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                     );
                                   },
                                 ),
                                 const SizedBox(height: 4),
                                 // 총 볼륨
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '총 ${record.totalVolume.toStringAsFixed(0)}kg',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  '총 볼륨: ${record.totalVolume.toStringAsFixed(0)}kg',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textTertiary,
+                                  ),
                                 ),
                               ],
                             ),
                           );
                         },
                       )
-                    : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.fitness_center,
-                              size: 48,
-                              color: Colors.grey[300],
+                    : const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Text(
+                            '기록이 없습니다',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textHint,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '기록이 없습니다',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
               ),
@@ -502,6 +474,7 @@ class _ExercisePageState extends State<ExercisePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -512,7 +485,7 @@ class _ExercisePageState extends State<ExercisePage> {
             left: 16,
             right: 16,
             top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -573,9 +546,9 @@ class _ExercisePageState extends State<ExercisePage> {
               ),
               const SizedBox(height: 16),
 
-              // 태그 입력
+              // 운동 종류
               const Text(
-                '태그',
+                '운동 종류',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -583,82 +556,52 @@ class _ExercisePageState extends State<ExercisePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: tagController,
-                decoration: InputDecoration(
-                  hintText: '예: 가슴, 등, 하체',
-                  hintStyle: const TextStyle(color: AppColors.textHint),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                ),
-                onChanged: (value) {
-                  setModalState(() {
-                    selectedTag = null;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
 
-              // 기존 태그 목록
-              if (_existingTags.isNotEmpty) ...[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _existingTags.map((tag) {
-                    final isSelected = selectedTag == tag;
-                    return GestureDetector(
-                      onTap: () {
-                        setModalState(() {
-                          selectedTag = tag;
-                          tagController.text = tag;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
+              // 태그 목록
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ['등', '어깨', '가슴', '하체', '힙', '팔', '복근', '유산소', '기타']
+                    .map((tag) {
+                  final isSelected = selectedTag == tag;
+                  return GestureDetector(
+                    onTap: () {
+                      setModalState(() {
+                        selectedTag = tag;
+                        tagController.text = tag;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
                           color: isSelected
                               ? AppColors.primary
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.border,
-                          ),
-                        ),
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isSelected
-                                ? Colors.white
-                                : AppColors.textTertiary,
-                          ),
+                              : AppColors.border,
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-              ] else
-                const SizedBox(height: 12),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.0,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
 
               // 저장 버튼
               GestureDetector(
@@ -671,7 +614,7 @@ class _ExercisePageState extends State<ExercisePage> {
                   }
                   if (tagController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('태그를 입력하세요')),
+                      const SnackBar(content: Text('운동 종류를 입력하세요')),
                     );
                     return;
                   }
@@ -880,44 +823,47 @@ class _ExercisePageState extends State<ExercisePage> {
 
             // 태그 필터
             SizedBox(
-              height: 36,
+              height: 40,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: _allTags.length,
                 itemBuilder: (context, index) {
                   final tag = _allTags[index];
                   final isSelected = _selectedTag == tag;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedTag = tag;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedTag = tag;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
                             color: isSelected
                                 ? AppColors.primary
-                                : AppColors.border,
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.border,
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isSelected
-                                ? Colors.white
-                                : AppColors.textTertiary,
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.0,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textTertiary,
+                            ),
                           ),
                         ),
                       ),
@@ -948,7 +894,7 @@ class _ExercisePageState extends State<ExercisePage> {
                           ),
                           const SizedBox(height: 16),
                           const Text(
-                            '운동이 없습니다',
+                            '운동이 없습니다몽',
                             style: TextStyle(
                               fontSize: 14,
                               color: AppColors.textHint,
@@ -996,7 +942,7 @@ class _ExercisePageState extends State<ExercisePage> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
-                                          vertical: 2,
+                                          vertical: 3,
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.primary
@@ -1007,6 +953,7 @@ class _ExercisePageState extends State<ExercisePage> {
                                           exercise.tag,
                                           style: const TextStyle(
                                             fontSize: 12,
+                                            height: 1.0,
                                             color: AppColors.primary,
                                           ),
                                         ),
@@ -1035,7 +982,7 @@ class _ExercisePageState extends State<ExercisePage> {
                                         child: SvgPicture.asset(
                                           'assets/icons/remove.svg',
                                           width: 20,
-                                          height: 20,
+                                          height: 18,
                                           colorFilter: const ColorFilter.mode(
                                             AppColors.iconBackground,
                                             BlendMode.srcIn,

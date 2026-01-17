@@ -11,6 +11,7 @@ class StorageService {
   static const String _recordsKey = 'workout_records';
   static const String _routinesKey = 'workout_routines';
   static const String _checkedSetsKey = 'metamong-checked-sets';
+  static const String _dailyMemosKey = 'workout_daily_memos';
 
   // 싱글톤 패턴 (앱 전체에서 하나의 인스턴스만 사용)
   static final StorageService _instance = StorageService._internal();
@@ -145,6 +146,35 @@ class StorageService {
     final key = '$recordId-$setIndex';
     checkedSets[key] = !(checkedSets[key] ?? false);
     await saveCheckedSets(checkedSets);
+  }
+
+  // === 일별 메모 ===
+
+  // 모든 메모 불러오기
+  Map<String, String> getDailyMemos() {
+    final String? data = _prefs?.getString(_dailyMemosKey);
+    if (data == null) return {};
+
+    final Map<String, dynamic> jsonMap = jsonDecode(data);
+    return jsonMap.map((key, value) => MapEntry(key, value as String));
+  }
+
+  // 특정 날짜의 메모 가져오기
+  String? getDailyMemo(String date) {
+    final memos = getDailyMemos();
+    return memos[date];
+  }
+
+  // 특정 날짜의 메모 저장
+  Future<void> saveDailyMemo(String date, String memo) async {
+    final memos = getDailyMemos();
+    if (memo.trim().isEmpty) {
+      memos.remove(date);
+    } else {
+      memos[date] = memo;
+    }
+    final String data = jsonEncode(memos);
+    await _prefs?.setString(_dailyMemosKey, data);
   }
 
   // === 데이터 내보내기/가져오기 ===
