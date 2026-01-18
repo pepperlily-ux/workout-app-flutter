@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 // 페이지들 import
 import 'pages/home_page.dart';
 import 'pages/calendar_page.dart';
+import 'pages/analysis_page.dart';
 import 'pages/routine_page.dart';
 import 'pages/exercise_page.dart';
 import 'pages/splash_page.dart';
@@ -23,7 +25,17 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
         scaffoldBackgroundColor: Colors.white,
+        fontFamily: 'Pretendard',
       ),
+      locale: const Locale('ko', 'KR'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ko', 'KR'),
+      ],
       home: const AppWrapper(),
     );
   }
@@ -64,7 +76,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0; // 현재 선택된 탭 (0: 홈, 1: 캘린더, 2: 루틴, 3: 운동)
+  int _currentIndex = 0; // 현재 선택된 탭 (0: 홈, 1: 캘린더, 2: 분석, 3: 루틴, 4: 운동)
   String? _selectedDate; // 캘린더에서 선택한 날짜
 
   // 캘린더에서 날짜 선택 시 홈으로 이동
@@ -88,6 +100,7 @@ class _MainScreenState extends State<MainScreen> {
         initialDate: _selectedDate,
       ),
       CalendarPage(onDateSelect: _onCalendarDateSelect),
+      const AnalysisPage(),
       const RoutinePage(),
       const ExercisePage(),
     ];
@@ -107,8 +120,9 @@ class _MainScreenState extends State<MainScreen> {
               children: [
                 _buildNavItem(0, 'assets/icons/home.svg', '홈', selectedColor, unselectedColor),
                 _buildNavItem(1, 'assets/icons/calendar.svg', '캘린더', selectedColor, unselectedColor),
-                _buildNavItem(2, 'assets/icons/routine.svg', '루틴', selectedColor, unselectedColor),
-                _buildNavItem(3, 'assets/icons/exercise.svg', '운동', selectedColor, unselectedColor),
+                _buildNavItem(2, 'assets/icons/analysis.svg', '분석', selectedColor, unselectedColor),
+                _buildNavItem(3, 'assets/icons/routine.svg', '루틴', selectedColor, unselectedColor),
+                _buildNavItem(4, 'assets/icons/exercise.svg', '운동', selectedColor, unselectedColor),
               ],
             ),
           ),
@@ -122,33 +136,32 @@ class _MainScreenState extends State<MainScreen> {
     final isSelected = _currentIndex == index;
     final color = isSelected ? selectedColor : unselectedColor;
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-          // 다른 탭으로 이동 시 선택된 날짜 초기화
-          if (index != 0) {
-            _selectedDate = null;
-          }
-        });
-      },
-      behavior: HitTestBehavior.opaque, // 빈 공간도 터치 가능
-      child: SizedBox(
-        width: 80, // 터치 영역 넓히기
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _currentIndex = index;
+            // 다른 탭으로 이동 시 선택된 날짜 초기화
+            if (index != 0) {
+              _selectedDate = null;
+            }
+          });
+        },
+        behavior: HitTestBehavior.opaque, // 빈 공간도 터치 가능
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SvgPicture.asset(
               iconPath,
-              width: 24,
-              height: 24,
+              width: 20,
+              height: 20,
               colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             ),
             const SizedBox(height: 4), // 아이콘과 텍스트 사이 간격
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 color: color,
               ),
             ),
