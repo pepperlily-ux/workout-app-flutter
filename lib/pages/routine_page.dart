@@ -158,7 +158,7 @@ class _RoutinePageState extends State<RoutinePage> {
             const Text(
               '데이터 관리',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
@@ -401,7 +401,6 @@ class _RoutinePageState extends State<RoutinePage> {
                 child: GestureDetector(
                   onTap: _showDataModal,
                   child: Container(
-                    padding: const EdgeInsets.only(bottom: 1),
                     decoration: const BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
@@ -441,7 +440,7 @@ class _RoutinePageState extends State<RoutinePage> {
           const SizedBox(height: 16),
           const Text(
             '저장된 루틴이 없습니다',
-            style: TextStyle(fontSize: 14, color: AppColors.textHint),
+            style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
         ],
       ),
@@ -539,6 +538,21 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
   String _selectedTag = '전체';
   final List<String> _selectedExercises = [];
 
+  bool get _canSave =>
+      _nameController.text.trim().isNotEmpty && _selectedExercises.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   List<String> get _tags {
     final tags = widget.exercises.map((e) => e.tag).toSet().toList();
     return ['전체', ...tags];
@@ -610,7 +624,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                 const Text(
                   '새 루틴 만들기',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
@@ -803,7 +817,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                       child: Center(
                         child: Text(
                           '이 태그의 운동이 없습니다',
-                          style: TextStyle(fontSize: 14, color: AppColors.textHint),
+                          style: TextStyle(fontSize: 12, color: AppColors.textHint),
                         ),
                       ),
                     ),
@@ -824,21 +838,21 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: GestureDetector(
-              onTap: _handleSave,
+              onTap: _canSave ? _handleSave : null,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: _canSave ? AppColors.primary : Colors.grey[300],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '루틴 저장',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                      color: _canSave ? Colors.white : Colors.grey[500],
                     ),
                   ),
                 ),
@@ -959,7 +973,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                 const Text(
                   '루틴 편집',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
@@ -1028,7 +1042,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                       child: Center(
                         child: Text(
                           '운동이 없습니다',
-                          style: TextStyle(fontSize: 14, color: AppColors.textHint),
+                          style: TextStyle(fontSize: 12, color: AppColors.textHint),
                         ),
                       ),
                     )
@@ -1191,7 +1205,7 @@ class _EditRoutineModalState extends State<_EditRoutineModal> {
                       child: Center(
                         child: Text(
                           '추가할 운동이 없습니다',
-                          style: TextStyle(fontSize: 14, color: AppColors.textHint),
+                          style: TextStyle(fontSize: 12, color: AppColors.textHint),
                         ),
                       ),
                     ),

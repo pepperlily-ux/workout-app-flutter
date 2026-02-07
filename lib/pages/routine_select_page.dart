@@ -63,11 +63,12 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
       recordsByDate[record.date]!.add(record);
     }
 
-    // 날짜 리스트 생성 (최신순 정렬)
+    // 날짜 리스트 생성 (최신순 정렬, 최대 30개)
     final dates = recordsByDate.keys.toList()
       ..sort((a, b) => b.compareTo(a));
+    final limitedDates = dates.take(30).toList();
 
-    _dateRecordsList = dates.map((date) {
+    _dateRecordsList = limitedDates.map((date) {
       final records = recordsByDate[date]!;
       records.sort((a, b) => a.order.compareTo(b.order)); // 순서대로 정렬
 
@@ -107,11 +108,16 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
     }
   }
 
-  // 날짜 문자열을 한국어로 변환 (예: "1월 15일")
+  // 날짜 문자열을 한국어로 변환 (예: "1월 15일 수요일")
   String _formatDateKorean(String dateStr) {
     final parts = dateStr.split('-');
     if (parts.length != 3) return dateStr;
-    return '${int.parse(parts[1])}월 ${int.parse(parts[2])}일';
+
+    const weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+    final date = DateTime.tryParse(dateStr);
+    final weekday = date != null ? weekdays[date.weekday - 1] : '';
+
+    return '${int.parse(parts[1])}월 ${int.parse(parts[2])}일 $weekday';
   }
 
   void _handleSelectRoutine() {
@@ -181,8 +187,13 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
           onTap: (_) => setState(() {}), // 탭 변경 시 UI 갱신
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textTertiary,
-          indicatorColor: AppColors.primary,
-          indicatorWeight: 2,
+          indicator: const UnderlineTabIndicator(
+            borderSide: BorderSide(
+              width: 2,
+              color: AppColors.primary,
+            ),
+            insets: EdgeInsets.symmetric(horizontal: 60),
+          ),
           tabs: const [
             Tab(text: '날짜'),
             Tab(text: '루틴'),

@@ -126,7 +126,7 @@ class _HomePageState extends State<HomePage> {
             '오늘의 메모',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
             ),
           ),
@@ -527,7 +527,7 @@ class _HomePageState extends State<HomePage> {
         },
         onDelete: (recordId) async {
           await _deleteRecord(recordId);
-          if (modalContext.mounted) Navigator.pop(modalContext);
+          // 모달은 닫지 않음 - 여러 개 삭제할 수 있도록
         },
       ),
     );
@@ -1761,11 +1761,21 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => widget.onDelete(record.id),
-                        child: const Icon(
-                          Icons.delete_outline,
-                          color: AppColors.error,
-                          size: 20,
+                        onTap: () {
+                          widget.onDelete(record.id);
+                          // 로컬 리스트에서도 제거하여 UI 즉시 업데이트
+                          setState(() {
+                            orderedRecords.removeWhere((r) => r.id == record.id);
+                          });
+                        },
+                        child: SvgPicture.asset(
+                          'assets/icons/remove.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.error,
+                            BlendMode.srcIn,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),

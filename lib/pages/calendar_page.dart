@@ -175,7 +175,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // 월 선택
               Row(
@@ -191,7 +191,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   Text(
                     '${_currentMonth.year}년 ${_currentMonth.month}월',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
@@ -206,7 +206,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // 요일 헤더
               Row(
@@ -229,7 +229,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     .toList(),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
               // 날짜 그리드
               GridView.builder(
@@ -289,7 +289,7 @@ class _CalendarPageState extends State<CalendarPage> {
                             const SizedBox(height: 2),
                             const Text(
                               '●',
-                              style: TextStyle(fontSize: 12, height: 1.0, color: AppColors.primary),
+                              style: TextStyle(fontSize: 8, height: 1.0, color: AppColors.primary),
                             ),
                           ],
                         ],
@@ -317,7 +317,7 @@ class _CalendarPageState extends State<CalendarPage> {
                       Text(
                         formatDateKorean(_selectedDay!),
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
@@ -422,7 +422,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                     const SizedBox(height: 16),
                                     const Text(
                                       '왜 운동 안하냐몽!?',
-                                      style: TextStyle(fontSize: 14, color: AppColors.textHint),
+                                      style: TextStyle(fontSize: 12, color: AppColors.textHint),
                                     ),
                                   ],
                                 ),

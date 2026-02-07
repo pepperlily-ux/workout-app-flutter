@@ -94,8 +94,8 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                   const Text(
                     '운동 추가',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
                     ),
                   ),
@@ -297,8 +297,8 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
         title: const Text(
           '운동 선택',
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,
           ),
         ),
@@ -508,44 +508,49 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
             ),
 
             // 하단 추가 버튼
-            if (_selectedExerciseIds.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: GestureDetector(
+                  onTap: _selectedExerciseIds.isNotEmpty ? _handleAddExercises : null,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _selectedExerciseIds.isNotEmpty
+                          ? AppColors.primary
+                          : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ],
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: GestureDetector(
-                    onTap: _handleAddExercises,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${_selectedExerciseIds.length}개 운동 추가',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
+                    child: Center(
+                      child: Text(
+                        _selectedExerciseIds.isNotEmpty
+                            ? '${_selectedExerciseIds.length}개 운동 추가'
+                            : '운동을 선택하세요',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: _selectedExerciseIds.isNotEmpty
+                              ? Colors.white
+                              : Colors.grey[500],
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),

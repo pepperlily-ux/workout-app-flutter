@@ -53,6 +53,54 @@ class _ExercisePageState extends State<ExercisePage> {
         .length;
   }
 
+  // 난이도 정보 반환
+  Map<String, dynamic> _getDifficultyInfo(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return {'text': '쉬웠다', 'icon': 'assets/icons/face_easy.svg'};
+      case 'medium':
+        return {'text': '할만했다', 'icon': 'assets/icons/face_medium.svg'};
+      case 'hard':
+        return {'text': '겨우했다', 'icon': 'assets/icons/face_hard.svg'};
+      default:
+        return {'text': '', 'icon': ''};
+    }
+  }
+
+  // 난이도 뱃지 위젯
+  Widget _buildDifficultyBadge(String difficulty) {
+    final info = _getDifficultyInfo(difficulty);
+    const color = AppColors.primary;
+    final bgColor = AppColors.primary.withValues(alpha: 0.1);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset(
+            info['icon'] as String,
+            width: 16,
+            height: 16,
+            colorFilter: const ColorFilter.mode(color, BlendMode.srcIn),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            info['text'] as String,
+            style: const TextStyle(
+              fontSize: 12,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // 운동 추가 모달
   void _showAddExerciseModal() {
     final nameController = TextEditingController();
@@ -86,7 +134,7 @@ class _ExercisePageState extends State<ExercisePage> {
                   const Text(
                     '운동 추가',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -131,6 +179,7 @@ class _ExercisePageState extends State<ExercisePage> {
                     vertical: 12,
                   ),
                 ),
+                onChanged: (_) => setModalState(() {}),
               ),
               const SizedBox(height: 16),
 
@@ -231,59 +280,54 @@ class _ExercisePageState extends State<ExercisePage> {
               const SizedBox(height: 24),
 
               // 추가 버튼
-              GestureDetector(
-                onTap: () async {
-                  if (nameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('운동 이름을 입력하세요')),
-                    );
-                    return;
-                  }
-                  if (tagController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('운동 종류를 입력하세요')),
-                    );
-                    return;
-                  }
+              Builder(
+                builder: (context) {
+                  final canAdd = nameController.text.trim().isNotEmpty &&
+                      tagController.text.trim().isNotEmpty;
+                  return GestureDetector(
+                    onTap: canAdd
+                        ? () async {
+                            final exercise = Exercise(
+                              id: DateTime.now().millisecondsSinceEpoch.toString(),
+                              name: nameController.text.trim(),
+                              tag: tagController.text.trim(),
+                            );
 
-                  final exercise = Exercise(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameController.text.trim(),
-                    tag: tagController.text.trim(),
-                  );
+                            await _storage.addExercise(exercise);
+                            setState(() {
+                              _exercises = _storage.getExercises();
+                            });
 
-                  await _storage.addExercise(exercise);
-                  setState(() {
-                    _exercises = _storage.getExercises();
-                  });
-
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${nameController.text.trim()} 추가됨'),
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${nameController.text.trim()} 추가됨'),
+                                ),
+                              );
+                            }
+                          }
+                        : null,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: canAdd ? AppColors.primary : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    );
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '추가',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
+                      child: Center(
+                        child: Text(
+                          '추가',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: canAdd ? Colors.white : Colors.grey[500],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ),
@@ -333,7 +377,7 @@ class _ExercisePageState extends State<ExercisePage> {
                             exercise.name,
                             style: const TextStyle(
                               fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w500,
                               color: AppColors.textPrimary,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -403,14 +447,22 @@ class _ExercisePageState extends State<ExercisePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // 날짜
-                                Text(
-                                  dateStr,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
+                                // 날짜 + 난이도
+                                Row(
+                                  children: [
+                                    Text(
+                                      dateStr,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    if (record.difficulty != null) ...[
+                                      const SizedBox(width: 8),
+                                      _buildDifficultyBadge(record.difficulty!),
+                                    ],
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
                                 // 세트 정보
@@ -498,7 +550,7 @@ class _ExercisePageState extends State<ExercisePage> {
                   const Text(
                     '운동 수정',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -976,16 +1028,21 @@ class _ExercisePageState extends State<ExercisePage> {
                                     ],
                                     // 삭제 아이콘
                                     GestureDetector(
-                                      onTap: () => _showDeleteConfirmDialog(exercise),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: SvgPicture.asset(
-                                          'assets/icons/remove.svg',
-                                          width: 20,
-                                          height: 18,
-                                          colorFilter: const ColorFilter.mode(
-                                            AppColors.iconBackground,
-                                            BlendMode.srcIn,
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () =>
+                                          _showDeleteConfirmDialog(exercise),
+                                      child: SizedBox(
+                                        width: 44,
+                                        height: 44,
+                                        child: Center(
+                                          child: SvgPicture.asset(
+                                            'assets/icons/remove.svg',
+                                            width: 20,
+                                            height: 18,
+                                            colorFilter: const ColorFilter.mode(
+                                              AppColors.iconBackground,
+                                              BlendMode.srcIn,
+                                            ),
                                           ),
                                         ),
                                       ),
