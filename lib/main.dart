@@ -106,7 +106,10 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     return Scaffold(
-      body: pages[_currentIndex], // 현재 선택된 탭의 화면 보여주기
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

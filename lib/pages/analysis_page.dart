@@ -680,50 +680,44 @@ class _AnalysisPageState extends State<AnalysisPage> {
       );
     }
 
-    return Column(
-      children: [
-        _buildHorizontalStatCard(
-          '운동 빈도',
-          _getWeeklyFrequency(),
-          Icons.fitness_center,
-        ),
-        const SizedBox(height: 12),
-        _buildHorizontalStatCard(
-          '총 볼륨',
-          _formatVolume(totalVolume),
-          Icons.show_chart,
-        ),
-        if (mostExercise != null) ...[
-          const SizedBox(height: 12),
-          _buildHorizontalStatCard(
-            '많이 한 운동',
-            mostExercise,
-            Icons.star,
-          ),
-        ],
-        if (mostBodyPart != null) ...[
-          const SizedBox(height: 12),
-          _buildHorizontalStatCard(
-            '많이 한 부위',
-            mostBodyPart,
-            Icons.accessibility_new,
-          ),
-        ],
-        if (bestGrowth != null) ...[
-          const SizedBox(height: 12),
-          _buildHorizontalStatCard(
-            '성장률 최고',
-            '${bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%',
-            Icons.trending_up,
-          ),
-        ],
-      ],
+    final stats = <Map<String, dynamic>>[
+      {'title': '운동 빈도', 'value': _getWeeklyFrequency(), 'icon': Icons.fitness_center},
+      {'title': '총 볼륨', 'value': _formatVolume(totalVolume), 'icon': Icons.show_chart},
+      if (mostExercise != null)
+        {'title': '많이 한 운동', 'value': mostExercise, 'icon': Icons.star},
+      if (mostBodyPart != null)
+        {'title': '많이 한 부위', 'value': mostBodyPart, 'icon': Icons.accessibility_new},
+      if (bestGrowth != null)
+        {
+          'title': '성장률 최고',
+          'value': '${bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%',
+          'icon': Icons.trending_up,
+        },
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.3,
+      ),
+      itemCount: stats.length,
+      itemBuilder: (context, index) {
+        final stat = stats[index];
+        return _buildStatCard(
+          stat['title'] as String,
+          stat['value'] as String,
+          stat['icon'] as IconData,
+        );
+      },
     );
   }
 
-  Widget _buildHorizontalStatCard(String title, String value, IconData icon) {
+  Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.backgroundLight,
@@ -732,6 +726,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
@@ -740,24 +735,28 @@ class _AnalysisPageState extends State<AnalysisPage> {
                 size: 18,
                 color: AppColors.primary,
               ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textTertiary,
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textTertiary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
