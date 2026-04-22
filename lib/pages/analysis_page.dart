@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
 import '../constants/app_colors.dart';
 import '../constants/metamon_messages.dart';
 import '../services/storage_service.dart';
@@ -241,173 +240,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
     return exercise.tag;
   }
 
-  // 훈수/칭찬 메시지 생성
-  String? _getMetamonMessage() {
-    final random = Random(DateTime.now().day); // 매일 같은 메시지
-    final workoutDays = _getMonthWorkoutDays();
-
-    // 가능한 메시지들 수집
-    final List<String> possibleMessages = [];
-
-    // 1. 운동 횟수 체크
-    if (workoutDays < workoutCountWarningThreshold) {
-      final msg = workoutCountWarnings[random.nextInt(workoutCountWarnings.length)]
-          .replaceAll('{count}', workoutDays.toString());
-      possibleMessages.add(msg);
-    } else if (workoutDays >= workoutCountPraiseThreshold) {
-      final msg = workoutCountPraises[random.nextInt(workoutCountPraises.length)]
-          .replaceAll('{count}', workoutDays.toString());
-      possibleMessages.add(msg);
-    }
-
-    // 2. 오래 쉼 체크
-    final daysSinceLastWorkout = _getDaysSinceLastWorkout();
-    if (daysSinceLastWorkout != null && daysSinceLastWorkout >= restDaysWarningThreshold) {
-      final msg = restDaysWarnings[random.nextInt(restDaysWarnings.length)]
-          .replaceAll('{days}', daysSinceLastWorkout.toString());
-      possibleMessages.add(msg);
-    }
-
-    // 3. 연속 운동 체크
-    final streakDays = _getStreakDays();
-    if (streakDays >= streakDaysPraiseThreshold) {
-      final msg = streakPraises[random.nextInt(streakPraises.length)]
-          .replaceAll('{days}', streakDays.toString());
-      possibleMessages.add(msg);
-    }
-
-    // 4. 부위 밸런스 체크
-    final bodyPartBalance = _getBodyPartBalance();
-    if (bodyPartBalance != null) {
-      final underBalanced = bodyPartBalance.entries
-          .where((e) => e.value < bodyPartWarningThreshold && e.value > 0)
-          .toList();
-
-      if (underBalanced.isNotEmpty) {
-        final weakPart = underBalanced.first;
-        final msg = bodyPartWarnings[random.nextInt(bodyPartWarnings.length)]
-            .replaceAll('{bodyPart}', weakPart.key)
-            .replaceAll('{percent}', weakPart.value.toStringAsFixed(0));
-        possibleMessages.add(msg);
-      } else if (bodyPartBalance.values.every((v) => v >= bodyPartPraiseThreshold)) {
-        possibleMessages.add(bodyPartPraises[random.nextInt(bodyPartPraises.length)]);
-      }
-    }
-
-    // 5. 특정 운동 편식 체크
-    final exerciseBias = _getExerciseBias();
-    if (exerciseBias != null && exerciseBias['percent'] >= exerciseBiasWarningThreshold) {
-      final msg = exerciseBiasWarnings[random.nextInt(exerciseBiasWarnings.length)]
-          .replaceAll('{exercise}', exerciseBias['name'] as String)
-          .replaceAll('{percent}', (exerciseBias['percent'] as double).toStringAsFixed(0));
-      possibleMessages.add(msg);
-    }
-
-    // 6. 성장률 체크
-    final bestGrowth = _getBestGrowthExercise();
-    if (bestGrowth != null && bestGrowth['growth'] >= growthPraiseThreshold) {
-      final msg = growthPraises[random.nextInt(growthPraises.length)]
-          .replaceAll('{exercise}', bestGrowth['name'] as String)
-          .replaceAll('{percent}', (bestGrowth['growth'] as double).toStringAsFixed(1));
-      possibleMessages.add(msg);
-    }
-
-    if (possibleMessages.isEmpty) return null;
-
-    // 랜덤으로 하나 선택
-    return possibleMessages[random.nextInt(possibleMessages.length)];
-  }
-
-  // 마지막 운동 이후 경과 일수
-  int? _getDaysSinceLastWorkout() {
-    if (_allRecords.isEmpty) return null;
-
-    final sortedRecords = _allRecords
-        .where((r) => r.totalVolume > 0)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-
-    if (sortedRecords.isEmpty) return null;
-
-    final lastDate = DateTime.tryParse(sortedRecords.first.date);
-    if (lastDate == null) return null;
-
-    return DateTime.now().difference(lastDate).inDays;
-  }
-
-  // 연속 운동 일수
-  int _getStreakDays() {
-    final dates = _allRecords
-        .where((r) => r.totalVolume > 0)
-        .map((r) => r.date)
-        .toSet()
-        .toList()
-      ..sort((a, b) => b.compareTo(a)); // 최신순
-
-    if (dates.isEmpty) return 0;
-
-    int streak = 0;
-    DateTime checkDate = DateTime.now();
-
-    for (final dateStr in dates) {
-      final date = DateTime.tryParse(dateStr);
-      if (date == null) continue;
-
-      final diff = checkDate.difference(date).inDays;
-      if (diff <= 1) {
-        streak++;
-        checkDate = date;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
-  }
-
-  // 부위별 비율
-  Map<String, double>? _getBodyPartBalance() {
-    final records = _getMonthRecords();
-    if (records.isEmpty) return null;
-
-    final countMap = <String, int>{};
-    int total = 0;
-
-    for (final record in records) {
-      final tag = _getExerciseTag(record.exerciseId);
-      if (tag.isNotEmpty) {
-        countMap[tag] = (countMap[tag] ?? 0) + 1;
-        total++;
-      }
-    }
-
-    if (total == 0) return null;
-
-    return countMap.map((key, value) => MapEntry(key, (value / total) * 100));
-  }
-
-  // 특정 운동 편식 체크
-  Map<String, dynamic>? _getExerciseBias() {
-    final records = _getMonthRecords();
-    if (records.isEmpty) return null;
-
-    final countMap = <String, int>{};
-    for (final record in records) {
-      countMap[record.exerciseId] = (countMap[record.exerciseId] ?? 0) + 1;
-    }
-
-    if (countMap.isEmpty) return null;
-
-    final total = countMap.values.reduce((a, b) => a + b);
-    final mostFrequent = countMap.entries.reduce((a, b) => a.value > b.value ? a : b);
-    final percent = (mostFrequent.value / total) * 100;
-
-    return {
-      'name': _getExerciseName(mostFrequent.key),
-      'percent': percent,
-    };
-  }
-
   // 볼륨 포맷
   String _formatVolume(double volume) {
     if (volume >= 10000) {
@@ -418,8 +250,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
 
   @override
   Widget build(BuildContext context) {
-    final message = _getMetamonMessage();
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -428,7 +258,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
           child: Column(
             children: [
               // 메타몽 섹션
-              _buildMetamonSection(message),
+              _buildMetamonSection(),
 
               const SizedBox(height: 24),
 
@@ -446,101 +276,61 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  Widget _buildMetamonSection(String? message) {
-    return Column(
+  Widget _buildMetamonSection() {
+    return Row(
       children: [
-        // 훈수 말풍선 (메타몽 위에)
-        if (message != null)
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              // 말풍선 꼬리
-              CustomPaint(
-                size: const Size(20, 10),
-                painter: _BubbleTailPainter(),
-              ),
-            ],
-          ),
-
-        // 메타몽 이미지
+        // 프로필 이미지 자리
         Container(
-          width: 150,
-          height: 150,
+          width: 56,
+          height: 56,
           decoration: BoxDecoration(
             color: AppColors.primaryBackground,
-            borderRadius: BorderRadius.circular(75),
+            borderRadius: BorderRadius.circular(28),
           ),
-          child: Center(
-            child: Image.asset(
-              'assets/metamon.png',
-              width: 120,
-              height: 120,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.catching_pokemon,
-                      size: 60,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Lv.$_level',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+          child: const Icon(
+            Icons.person,
+            size: 32,
+            color: AppColors.primary,
           ),
         ),
-
-        const SizedBox(height: 16),
-
-        // 레벨 바 (메인)
-        Column(
-          children: [
-            Text(
-              'Lv.$_level',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+        const SizedBox(width: 16),
+        // 레벨 + 프로그레스 바
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Lv.$_level',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (_level < maxLevel)
+                    Text(
+                      '레벨 업까지 남은 운동 횟수: ${_nextLevelRequirement - _currentXp}회',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textTertiary,
+                      ),
+                    )
+                  else
+                    const Text(
+                      '만렙 달성!',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            // 프로그레스 바
-            SizedBox(
-              width: 200,
-              child: Container(
+              const SizedBox(height: 6),
+              Container(
                 height: 12,
                 decoration: BoxDecoration(
                   color: AppColors.backgroundGrey,
@@ -560,27 +350,8 @@ class _AnalysisPageState extends State<AnalysisPage> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            // 레벨 업까지 남은 횟수
-            if (_level < maxLevel)
-              Text(
-                '레벨 업까지 남은 운동 횟수: ${_nextLevelRequirement - _currentXp}회',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textTertiary,
-                ),
-              )
-            else
-              const Text(
-                '만렙 달성!',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -627,6 +398,22 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
+  // 이전 달 대비 총 볼륨 성장률
+  String? _getOverallGrowthRate() {
+    final prevMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    final prevMonthStr = '${prevMonth.year}-${prevMonth.month.toString().padLeft(2, '0')}';
+    final prevVolume = _allRecords
+        .where((r) => r.date.startsWith(prevMonthStr) && r.totalVolume > 0)
+        .fold(0.0, (sum, r) => sum + r.totalVolume);
+
+    if (prevVolume == 0) return null;
+
+    final currentVolume = _getMonthTotalVolume();
+    final growth = ((currentVolume - prevVolume) / prevVolume) * 100;
+    final sign = growth >= 0 ? '+' : '';
+    return '$sign${growth.toStringAsFixed(1)}%';
+  }
+
   // 주간 운동 빈도 계산
   String _getWeeklyFrequency() {
     final workoutDays = _getMonthWorkoutDays();
@@ -664,6 +451,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
     final mostExercise = _getMostFrequentExercise();
     final mostBodyPart = _getMostFrequentBodyPart();
     final bestGrowth = _getBestGrowthExercise();
+    final overallGrowth = _getOverallGrowthRate();
 
     if (workoutDays == 0) {
       return Container(
@@ -682,17 +470,18 @@ class _AnalysisPageState extends State<AnalysisPage> {
 
     final stats = <Map<String, dynamic>>[
       {'title': '운동 빈도', 'value': _getWeeklyFrequency(), 'icon': Icons.fitness_center},
+      {'title': '헬스장 간 횟수', 'value': '$workoutDays일', 'icon': Icons.calendar_today},
       {'title': '총 볼륨', 'value': _formatVolume(totalVolume), 'icon': Icons.show_chart},
-      if (mostExercise != null)
-        {'title': '많이 한 운동', 'value': mostExercise, 'icon': Icons.star},
-      if (mostBodyPart != null)
-        {'title': '많이 한 부위', 'value': mostBodyPart, 'icon': Icons.accessibility_new},
-      if (bestGrowth != null)
-        {
-          'title': '성장률 최고',
-          'value': '${bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%',
-          'icon': Icons.trending_up,
-        },
+      {'title': '전체 성장률', 'value': overallGrowth ?? '+0.0%', 'icon': Icons.trending_up},
+      {'title': '많이 한 운동', 'value': mostExercise ?? '없음', 'icon': Icons.star},
+      {'title': '많이 한 부위', 'value': mostBodyPart ?? '없음', 'icon': Icons.accessibility_new},
+      {
+        'title': '성장률 최고',
+        'value': bestGrowth != null
+            ? '${bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%'
+            : '없음 +0.0%',
+        'icon': Icons.trending_up,
+      },
     ];
 
     return GridView.builder(
@@ -764,23 +553,3 @@ class _AnalysisPageState extends State<AnalysisPage> {
   }
 }
 
-// 말풍선 꼬리 그리기
-class _BubbleTailPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

@@ -245,8 +245,9 @@ class _HomePageState extends State<HomePage> {
 
   // 루틴 선택 (여러 운동 한번에 추가)
   Future<void> _selectRoutine(Routine routine) async {
+    final latestExercises = _storage.getExercises();
     for (final exerciseId in routine.exerciseIds) {
-      final exercise = exercises.firstWhere(
+      final exercise = latestExercises.firstWhere(
         (e) => e.id == exerciseId,
         orElse: () => Exercise(id: '', name: '', tag: ''),
       );
@@ -256,34 +257,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 세트 추가 - 원본 로직: 이전 운동 참조 → 오늘 마지막 세트 → 빈 세트
+  // 세트 추가 - 마지막 세트 복사 → 빈 세트
   Future<void> _addSet(Record record) async {
-    final nextSetIndex = record.sets.length;
-    WorkoutSet newSet;
+    final WorkoutSet newSet;
 
-    // 1순위: 이전 운동 기록에서 같은 인덱스의 세트 가져오기
-    final history = _storage.getExerciseHistory(record.exerciseId);
-    final selectedDateStr = _formatDate(selectedDate);
-
-    // 오늘 이전의 가장 최근 기록 찾기
-    Record? previousRecord;
-    for (final r in history) {
-      if (r.date.compareTo(selectedDateStr) < 0 && r.totalVolume > 0) {
-        previousRecord = r;
-        break;
-      }
-    }
-
-    if (previousRecord != null && nextSetIndex < previousRecord.sets.length) {
-      // 이전 운동에 해당 인덱스 세트가 있으면 복사
-      final prevSet = previousRecord.sets[nextSetIndex];
-      newSet = WorkoutSet(weight: prevSet.weight, reps: prevSet.reps);
-    } else if (record.sets.isNotEmpty) {
-      // 2순위: 오늘 마지막 세트 복사
+    if (record.sets.isNotEmpty) {
       final lastSet = record.sets.last;
       newSet = WorkoutSet(weight: lastSet.weight, reps: lastSet.reps);
     } else {
-      // 3순위: 빈 세트
       newSet = WorkoutSet();
     }
 
@@ -475,6 +456,7 @@ class _HomePageState extends State<HomePage> {
 
   // 운동 선택 페이지로 이동
   void _showExerciseModal() {
+    exercises = _storage.getExercises();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -496,7 +478,6 @@ class _HomePageState extends State<HomePage> {
             setState(() {
               exercises = _storage.getExercises();
             });
-            _addExerciseToRecord(exercise);
           },
         ),
       ),
@@ -1151,7 +1132,7 @@ class _HomePageState extends State<HomePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Image.asset(
-                          'assets/home.png',
+                          'assets/Normal.png',
                           width: 200,
                         ),
                         const SizedBox(height: 16),

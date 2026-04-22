@@ -25,16 +25,23 @@ class ExerciseSelectPage extends StatefulWidget {
 class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
   String _selectedTag = '전체';
   final Set<String> _selectedExerciseIds = {};
+  late List<Exercise> _exercises;
+
+  @override
+  void initState() {
+    super.initState();
+    _exercises = widget.storage.getExercises();
+  }
 
   List<String> get _allTags {
-    final tags = widget.exercises.map((e) => e.tag).toSet().toList();
+    final tags = _exercises.map((e) => e.tag).toSet().toList();
     tags.sort();
     return ['전체', ...tags];
   }
 
   List<Exercise> get _filteredExercises {
-    if (_selectedTag == '전체') return widget.exercises;
-    return widget.exercises.where((e) => e.tag == _selectedTag).toList();
+    if (_selectedTag == '전체') return _exercises;
+    return _exercises.where((e) => e.tag == _selectedTag).toList();
   }
 
   int _getRecordCount(String exerciseId) {
@@ -54,7 +61,7 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
   }
 
   void _handleAddExercises() {
-    final selectedExercises = widget.exercises
+    final selectedExercises = _exercises
         .where((e) => _selectedExerciseIds.contains(e.id))
         .toList();
     widget.onSelectMultiple(selectedExercises);
@@ -254,8 +261,19 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                     return;
                   }
 
+                  final name = nameController.text.trim();
+                  final tag = tagController.text.trim();
                   Navigator.pop(modalContext);
-                  widget.onAddNew(nameController.text.trim(), tagController.text.trim());
+                  await widget.onAddNew(name, tag);
+                  if (mounted) {
+                    setState(() {
+                      _exercises = widget.storage.getExercises();
+                      final newExercise = _exercises.where((e) => e.name == name && e.tag == tag).lastOrNull;
+                      if (newExercise != null) {
+                        _selectedExerciseIds.add(newExercise.id);
+                      }
+                    });
+                  }
                 },
                 child: Container(
                   width: double.infinity,
@@ -394,7 +412,7 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            'assets/home.png',
+                            'assets/Baby.png',
                             width: 160,
                             errorBuilder: (context, error, stackTrace) =>
                                 Icon(

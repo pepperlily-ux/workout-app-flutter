@@ -68,6 +68,7 @@ class _RoutinePageState extends State<RoutinePage> {
 
   // 새 루틴 만들기 모달
   void _showCreateRoutineModal() {
+    _exercises = _storage.getExercises();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -85,6 +86,7 @@ class _RoutinePageState extends State<RoutinePage> {
 
   // 루틴 편집 모달
   void _showEditRoutineModal(Routine routine) {
+    _exercises = _storage.getExercises();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -237,7 +239,7 @@ class _RoutinePageState extends State<RoutinePage> {
       // 공유 시트 열기
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: '메타몽 과부하 백업',
+        subject: '헬스몽 과부하 백업',
         text: '운동 기록 백업 파일',
       );
 
@@ -433,7 +435,7 @@ class _RoutinePageState extends State<RoutinePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
-            'assets/home.png',
+            'assets/Baby.png',
             width: 200,
             errorBuilder: (context, error, stackTrace) => const SizedBox(height: 100),
           ),

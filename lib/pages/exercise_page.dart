@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/exercise.dart';
+import '../models/routine.dart';
 import '../services/storage_service.dart';
 import '../constants/app_colors.dart';
 
@@ -609,49 +610,81 @@ class _ExercisePageState extends State<ExercisePage> {
               ),
               const SizedBox(height: 8),
 
-              // 태그 목록
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: ['등', '어깨', '가슴', '하체', '힙', '팔', '복근', '유산소', '기타']
-                    .map((tag) {
-                  final isSelected = selectedTag == tag;
-                  return GestureDetector(
-                    onTap: () {
-                      setModalState(() {
-                        selectedTag = tag;
-                        tagController.text = tag;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.border,
+              // 운동 종류 직접 입력
+              TextField(
+                controller: tagController,
+                decoration: InputDecoration(
+                  hintText: '예: 가슴, 등, 하체...',
+                  hintStyle: const TextStyle(color: AppColors.textHint),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (value) {
+                  setModalState(() {
+                    selectedTag = value.trim().isEmpty ? null : value.trim();
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // 기존 태그 목록 (빠른 선택용)
+              Builder(
+                builder: (context) {
+                  final existingTags = _exercises.map((e) => e.tag).toSet();
+                  final defaultTags = {'등', '가슴', '하체', '어깨'};
+                  final allTags = {...defaultTags, ...existingTags}.toList()..sort();
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: allTags.map((tag) {
+                      final isSelected = selectedTag == tag;
+                      return GestureDetector(
+                        onTap: () {
+                          setModalState(() {
+                            selectedTag = tag;
+                            tagController.text = tag;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected ? AppColors.primary : AppColors.border,
+                            ),
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.0,
+                              color: isSelected ? Colors.white : AppColors.textTertiary,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        tag,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.0,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textTertiary,
-                        ),
-                      ),
-                    ),
+                      );
+                    }).toList(),
                   );
-                }).toList(),
+                },
               ),
               const SizedBox(height: 24),
 
@@ -725,7 +758,7 @@ class _ExercisePageState extends State<ExercisePage> {
                     builder: (dialogContext) => AlertDialog(
                       title: const Text('운동 삭제'),
                       content: Text(
-                        '${exercise.name}을(를) 삭제하시겠습니까?\n관련 기록도 모두 삭제됩니다.',
+                        '${exercise.name}을(를) 삭제하면 관련된 모든 기록, 통계, 루틴에서도 제거되며, 되돌릴 수 없습니다. 내용 변경 시 삭제 대신 수정을 해주세요.',
                       ),
                       actions: [
                         TextButton(
@@ -753,6 +786,15 @@ class _ExercisePageState extends State<ExercisePage> {
                     final records = _storage.getRecords();
                     records.removeWhere((r) => r.exerciseId == exercise.id);
                     await _storage.saveRecords(records);
+
+                    // 루틴에서 해당 운동 제거
+                    final routines = _storage.getRoutines();
+                    final updatedRoutines = routines.map((r) => Routine(
+                      id: r.id,
+                      name: r.name,
+                      exerciseIds: r.exerciseIds.where((id) => id != exercise.id).toList(),
+                    )).toList();
+                    await _storage.saveRoutines(updatedRoutines);
 
                     setState(() {
                       _exercises = _storage.getExercises();
@@ -800,7 +842,7 @@ class _ExercisePageState extends State<ExercisePage> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('운동 삭제'),
         content: Text(
-          '${exercise.name}을(를) 삭제하시겠습니까?\n관련 기록도 모두 삭제됩니다.',
+          '${exercise.name}을(를) 삭제하면 관련된 모든 운동 기록과 통계도 함께 삭제됩니다. 이 작업은 되돌릴 수 없어요.\n\n잘못 입력한 거라면 삭제 대신 수정을 해주세요.',
         ),
         actions: [
           TextButton(
@@ -818,6 +860,15 @@ class _ExercisePageState extends State<ExercisePage> {
               final records = _storage.getRecords();
               records.removeWhere((r) => r.exerciseId == exercise.id);
               await _storage.saveRecords(records);
+
+              // 루틴에서 해당 운동 제거
+              final routines = _storage.getRoutines();
+              final updatedRoutines = routines.map((r) => Routine(
+                id: r.id,
+                name: r.name,
+                exerciseIds: r.exerciseIds.where((id) => id != exercise.id).toList(),
+              )).toList();
+              await _storage.saveRoutines(updatedRoutines);
 
               setState(() {
                 _exercises = _storage.getExercises();
@@ -935,7 +986,7 @@ class _ExercisePageState extends State<ExercisePage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            'assets/home.png',
+                            'assets/Baby.png',
                             width: 160,
                             errorBuilder: (context, error, stackTrace) =>
                                 Icon(

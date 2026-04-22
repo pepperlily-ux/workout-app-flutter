@@ -54,7 +54,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                     Column(
                       children: [
                         const Text(
-                          '메타몽과 함께하는',
+                          '헬스몽과 함께하는',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w600,
@@ -76,7 +76,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                     const SizedBox(height: 40),
                     // 로고 이미지
                     Image.asset(
-                      'assets/home.png',
+                      'assets/Normal.png',
                       width: 203,
                       height: 203,
                       errorBuilder: (context, error, stackTrace) => Container(

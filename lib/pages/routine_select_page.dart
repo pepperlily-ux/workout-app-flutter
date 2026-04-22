@@ -40,7 +40,7 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _routines = List.from(widget.routines);
+    _routines = widget.storage.getRoutines();
     _loadDateRecords();
   }
 
@@ -102,7 +102,7 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
 
   Exercise? _getExerciseById(String id) {
     try {
-      return widget.exercises.firstWhere((e) => e.id == id);
+      return widget.storage.getExercises().firstWhere((e) => e.id == id);
     } catch (e) {
       return null;
     }
@@ -272,7 +272,7 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/home.png',
+              'assets/Baby.png',
               width: 160,
               errorBuilder: (context, error, stackTrace) =>
                   Icon(
@@ -432,7 +432,7 @@ class _RoutineSelectPageState extends State<RoutineSelectPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/home.png',
+              'assets/Baby.png',
               width: 160,
               errorBuilder: (context, error, stackTrace) =>
                   Icon(
