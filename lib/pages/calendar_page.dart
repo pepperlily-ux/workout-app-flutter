@@ -11,10 +11,11 @@ class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key, this.onDateSelect});
 
   @override
-  State<CalendarPage> createState() => _CalendarPageState();
+  State<CalendarPage> createState() => CalendarPageState();
 }
 
-class _CalendarPageState extends State<CalendarPage> {
+class CalendarPageState extends State<CalendarPage> {
+  void reload() => _loadData();
   final StorageService _storage = StorageService();
   DateTime _currentMonth = DateTime.now();
   int? _selectedDay;
@@ -28,7 +29,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _loadData() async {
-    await _storage.init();
+    // main()에서 이미 초기화 보장 — 여기선 데이터만 읽음
     if (!mounted) return;
     setState(() {
       _records = _storage.getRecords();
@@ -83,6 +84,8 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _nextMonth() {
+    final now = DateTime.now();
+    if (_currentMonth.year == now.year && _currentMonth.month == now.month) return;
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 1);
       _selectedDay = null;
@@ -196,13 +199,19 @@ class _CalendarPageState extends State<CalendarPage> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: _nextMonth,
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.chevron_right, size: 24, color: AppColors.divider),
-                    ),
-                  ),
+                  Builder(builder: (context) {
+                    final now = DateTime.now();
+                    final isCurrentMonth = _currentMonth.year == now.year && _currentMonth.month == now.month;
+                    return GestureDetector(
+                      onTap: isCurrentMonth ? null : _nextMonth,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(Icons.chevron_right, size: 24,
+                          color: isCurrentMonth ? AppColors.border : AppColors.divider,
+                        ),
+                      ),
+                    );
+                  }),
                 ],
               ),
 
@@ -330,7 +339,8 @@ class _CalendarPageState extends State<CalendarPage> {
                           if (exercise == null) return const SizedBox();
 
                           final setStrings = record.sets
-                              .map((s) => '${s.weight}kg × ${s.reps}회')
+                              .where((s) => s.weight != null && s.reps != null)
+                              .map((s) => '${s.weight! % 1 == 0 ? s.weight!.toInt() : s.weight}kg × ${s.reps}회')
                               .toList();
                           final volume = _calculateVolume(record.sets);
 

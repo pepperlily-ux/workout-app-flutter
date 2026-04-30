@@ -1,4 +1,4 @@
-package com.example.hello_world
+package com.pepperlily.healthmong
 
 import io.flutter.embedding.android.FlutterActivity
 

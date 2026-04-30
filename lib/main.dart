@@ -4,14 +4,17 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 // 페이지들 import
 import 'pages/home_page.dart';
-import 'pages/calendar_page.dart';
-import 'pages/analysis_page.dart';
+import 'pages/calendar_page.dart' show CalendarPage, CalendarPageState;
+import 'pages/analysis_page.dart' show AnalysisPage, AnalysisPageState;
 import 'pages/routine_page.dart';
-import 'pages/exercise_page.dart';
+import 'pages/exercise_page.dart' show ExercisePage, ExercisePageState;
 import 'pages/splash_page.dart';
 import 'constants/app_colors.dart';
+import 'services/storage_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await StorageService().init();
   runApp(const MyApp());
 }
 
@@ -76,8 +79,11 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0; // 현재 선택된 탭 (0: 홈, 1: 캘린더, 2: 분석, 3: 루틴, 4: 운동)
-  String? _selectedDate; // 캘린더에서 선택한 날짜
+  int _currentIndex = 0;
+  String? _selectedDate;
+  final _calendarKey = GlobalKey<CalendarPageState>();
+  final _analysisKey = GlobalKey<AnalysisPageState>();
+  final _exerciseKey = GlobalKey<ExercisePageState>();
 
   // 캘린더에서 날짜 선택 시 홈으로 이동
   void _onCalendarDateSelect(String date) {
@@ -99,10 +105,10 @@ class _MainScreenState extends State<MainScreen> {
         key: ValueKey(_selectedDate),
         initialDate: _selectedDate,
       ),
-      CalendarPage(onDateSelect: _onCalendarDateSelect),
-      const AnalysisPage(),
+      CalendarPage(key: _calendarKey, onDateSelect: _onCalendarDateSelect),
+      AnalysisPage(key: _analysisKey),
       const RoutinePage(),
-      const ExercisePage(),
+      ExercisePage(key: _exerciseKey),
     ];
 
     return Scaffold(
@@ -143,11 +149,14 @@ class _MainScreenState extends State<MainScreen> {
       child: GestureDetector(
         onTap: () {
           setState(() {
-            _currentIndex = index;
             // 다른 탭으로 이동 시 선택된 날짜 초기화
             if (index != 0) {
               _selectedDate = null;
             }
+            if (index == 1) _calendarKey.currentState?.reload();
+            if (index == 2) _analysisKey.currentState?.reload();
+            if (index == 4) _exerciseKey.currentState?.reload();
+            _currentIndex = index;
           });
         },
         behavior: HitTestBehavior.opaque, // 빈 공간도 터치 가능

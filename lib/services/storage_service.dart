@@ -12,6 +12,8 @@ class StorageService {
   static const String _routinesKey = 'workout_routines';
   static const String _checkedSetsKey = 'metamong-checked-sets';
   static const String _dailyMemosKey = 'workout_daily_memos';
+  static const String _profileCharacterKey = 'profile_character';
+  static const String _profileColorKey = 'profile_color';
 
   // 싱글톤 패턴 (앱 전체에서 하나의 인스턴스만 사용)
   static final StorageService _instance = StorageService._internal();
@@ -31,9 +33,12 @@ class StorageService {
   List<Exercise> getExercises() {
     final String? data = _prefs?.getString(_exercisesKey);
     if (data == null) return [];
-
-    final List<dynamic> jsonList = jsonDecode(data);
-    return jsonList.map((json) => Exercise.fromJson(json)).toList();
+    try {
+      final List<dynamic> jsonList = jsonDecode(data);
+      return jsonList.map((json) => Exercise.fromJson(json)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   // 운동 목록 저장
@@ -55,9 +60,12 @@ class StorageService {
   List<Record> getRecords() {
     final String? data = _prefs?.getString(_recordsKey);
     if (data == null) return [];
-
-    final List<dynamic> jsonList = jsonDecode(data);
-    return jsonList.map((json) => Record.fromJson(json)).toList();
+    try {
+      final List<dynamic> jsonList = jsonDecode(data);
+      return jsonList.map((json) => Record.fromJson(json)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   // 기록 목록 저장
@@ -112,9 +120,12 @@ class StorageService {
   List<Routine> getRoutines() {
     final String? data = _prefs?.getString(_routinesKey);
     if (data == null) return [];
-
-    final List<dynamic> jsonList = jsonDecode(data);
-    return jsonList.map((json) => Routine.fromJson(json)).toList();
+    try {
+      final List<dynamic> jsonList = jsonDecode(data);
+      return jsonList.map((json) => Routine.fromJson(json)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   // 루틴 목록 저장
@@ -175,6 +186,24 @@ class StorageService {
     }
     final String data = jsonEncode(memos);
     await _prefs?.setString(_dailyMemosKey, data);
+  }
+
+  // === 프로필 ===
+
+  String getProfileCharacter() {
+    return _prefs?.getString(_profileCharacterKey) ?? 'baby';
+  }
+
+  Future<void> saveProfileCharacter(String character) async {
+    await _prefs?.setString(_profileCharacterKey, character);
+  }
+
+  int getProfileColor() {
+    return _prefs?.getInt(_profileColorKey) ?? 0xFFFFEE99;
+  }
+
+  Future<void> saveProfileColor(int color) async {
+    await _prefs?.setInt(_profileColorKey, color);
   }
 
   // === 데이터 내보내기/가져오기 ===

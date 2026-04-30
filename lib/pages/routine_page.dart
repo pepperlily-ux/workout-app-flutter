@@ -267,10 +267,20 @@ class _RoutinePageState extends State<RoutinePage> {
       );
 
       if (result == null || result.files.isEmpty) {
-        return; // 취소됨
+        return;
       }
 
-      final file = File(result.files.single.path!);
+      final path = result.files.single.path;
+      if (path == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('클라우드 파일은 지원하지 않습니다. 기기에 저장된 파일을 선택해주세요.')),
+          );
+        }
+        return;
+      }
+
+      final file = File(path);
       final jsonString = await file.readAsString();
 
       // 확인 다이얼로그

@@ -489,6 +489,7 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1631,14 +1632,18 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: 16 + MediaQuery.of(context).padding.bottom,
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
       ),
-      child: Column(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: 16 + MediaQuery.of(context).padding.bottom,
+        ),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1689,8 +1694,9 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
               ),
             )
           else
-            ReorderableListView.builder(
-              shrinkWrap: true,
+            Flexible(
+              child: ReorderableListView.builder(
+              shrinkWrap: false,
               itemCount: orderedRecords.length,
               onReorder: (oldIndex, newIndex) {
                 setState(() {
@@ -1759,17 +1765,14 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.drag_handle,
-                        color: AppColors.textHint,
-                      ),
                     ],
                   ),
                 );
               },
             ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1903,13 +1906,13 @@ class _GrowthDetailModal extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ...previousRecord.sets.asMap().entries.map((entry) {
+                            ...previousRecord.sets.where((s) => s.weight != null && s.reps != null).toList().asMap().entries.map((entry) {
                               final setIndex = entry.key;
                               final set = entry.value;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Text(
-                                  '세트 ${setIndex + 1}: ${formatWeight(set.weight)}kg × ${set.reps}회',
+                                  '세트 ${setIndex + 1}: ${set.weight! % 1 == 0 ? set.weight!.toInt() : set.weight}kg × ${set.reps}회',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textSecondary,
@@ -1986,28 +1989,49 @@ class _DifficultyModal extends StatelessWidget {
           // 헤더
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                exerciseName,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        exerciseName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: SvgPicture.asset(
+                        'assets/icons/remove.svg',
+                        width: 18,
+                        height: 18,
+                        colorFilter: const ColorFilter.mode(
+                          AppColors.iconBackground,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              GestureDetector(
-                onTap: onDelete,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: SvgPicture.asset(
-                    'assets/icons/remove.svg',
-                    width: 20,
-                    height: 20,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.iconBackground,
-                      BlendMode.srcIn,
-                    ),
-                  ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  '완료',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
@@ -2195,13 +2219,13 @@ class _ExerciseHistoryModal extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ...record.sets.asMap().entries.map((entry) {
+                        ...record.sets.where((s) => s.weight != null && s.reps != null).toList().asMap().entries.map((entry) {
                           final setIndex = entry.key;
                           final set = entry.value;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text(
-                              '세트 ${setIndex + 1}: ${formatWeight(set.weight)}kg × ${set.reps}회',
+                              '세트 ${setIndex + 1}: ${set.weight! % 1 == 0 ? set.weight!.toInt() : set.weight}kg × ${set.reps}회',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,

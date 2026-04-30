@@ -10,10 +10,11 @@ class ExercisePage extends StatefulWidget {
   const ExercisePage({super.key});
 
   @override
-  State<ExercisePage> createState() => _ExercisePageState();
+  State<ExercisePage> createState() => ExercisePageState();
 }
 
-class _ExercisePageState extends State<ExercisePage> {
+class ExercisePageState extends State<ExercisePage> {
+  void reload() => _loadData();
   final StorageService _storage = StorageService();
 
   String _selectedTag = '전체';
@@ -474,7 +475,7 @@ class _ExercisePageState extends State<ExercisePage> {
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 4),
                                       child: Text(
-                                        '세트 ${setIndex + 1}: ${set.weight ?? 0}kg × ${set.reps ?? 0}회',
+                                        '세트 ${setIndex + 1}: ${(set.weight ?? 0) % 1 == 0 ? (set.weight ?? 0).toInt() : set.weight ?? 0}kg × ${set.reps ?? 0}회',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: AppColors.textSecondary,
