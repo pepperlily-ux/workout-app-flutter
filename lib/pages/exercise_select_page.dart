@@ -443,7 +443,7 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                                       ),
                                     ),
                                     child: Icon(
-                                      Icons.bookmark,
+                                      Icons.bookmark_border,
                                       size: 16,
                                       color: isSelected ? Colors.white : AppColors.textTertiary,
                                     ),

@@ -451,7 +451,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                                     ),
                                   ),
                                   child: Icon(
-                                    Icons.bookmark,
+                                    Icons.bookmark_border,
                                     size: 16,
                                     color: isSelected ? Colors.white : AppColors.textTertiary,
                                   ),
@@ -993,7 +993,7 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
                                       ),
                                     ),
                                     child: Icon(
-                                      Icons.bookmark,
+                                      Icons.bookmark_border,
                                       size: 16,
                                       color: isSelected ? Colors.white : AppColors.textTertiary,
                                     ),

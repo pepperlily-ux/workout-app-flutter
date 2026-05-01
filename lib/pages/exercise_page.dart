@@ -869,7 +869,7 @@ class ExercisePageState extends State<ExercisePage> {
                               ),
                             ),
                             child: Icon(
-                              Icons.bookmark,
+                              Icons.bookmark_border,
                               size: 16,
                               color: isSelected ? Colors.white : AppColors.textTertiary,
                             ),
@@ -1012,8 +1012,9 @@ class ExercisePageState extends State<ExercisePage> {
                                 ),
                                 GestureDetector(
                                   onTap: () => _toggleBookmark(exercise.id),
+                                  behavior: HitTestBehavior.opaque,
                                   child: Padding(
-                                    padding: const EdgeInsets.only(left: 12),
+                                    padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
                                     child: Icon(
                                       isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                                       size: 22,
