@@ -94,32 +94,6 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                       ),
                     ),
                     const Spacer(),
-                    // 하단 푸터
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 20),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Lily.',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFAFAFAF),
-                              fontFamily: 'Quantico',
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Flutter ver.1.0',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: Color(0xFFC5C5C5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),

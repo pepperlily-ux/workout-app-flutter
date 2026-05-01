@@ -126,7 +126,7 @@ class _HomePageState extends State<HomePage> {
             '오늘의 메모',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
@@ -185,22 +185,6 @@ class _HomePageState extends State<HomePage> {
       selectedDate = DateTime.now();
       _loadDateRecords();
     });
-  }
-
-  // 날짜 선택
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      setState(() {
-        selectedDate = picked;
-        _loadDateRecords();
-      });
-    }
   }
 
   // 운동 이름 가져오기
@@ -949,36 +933,17 @@ class _HomePageState extends State<HomePage> {
                             ],
                           ),
                         ),
-                        // 오른쪽: 캘린더 아이콘 + 메뉴 아이콘
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _selectDate,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: SvgPicture.asset(
-                                  'assets/icons/calendar.svg',
-                                  width: 24,
-                                  height: 24,
-                                  colorFilter: const ColorFilter.mode(
-                                    AppColors.textMuted,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
+                        // 오른쪽: 순서변경 아이콘
+                        GestureDetector(
+                          onTap: _showOrderModal,
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.reorder,
+                              size: 24,
+                              color: AppColors.textMuted,
                             ),
-                            GestureDetector(
-                              onTap: _showOrderModal,
-                              child: const Padding(
-                                padding: EdgeInsets.all(8),
-                                child: Icon(
-                                  Icons.menu,
-                                  size: 24,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -1279,7 +1244,7 @@ class _ExerciseCard extends StatelessWidget {
                           text: '$exerciseIndex ',
                           style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.primary,
                           ),
                         ),
@@ -1287,7 +1252,7 @@ class _ExerciseCard extends StatelessWidget {
                           text: exerciseName,
                           style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
                         ),
@@ -1341,7 +1306,7 @@ class _ExerciseCard extends StatelessWidget {
                     child: Text(
                       '세트 ${index + 1}',
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 12,
                         color: AppColors.textHint,
                       ),
                     ),
@@ -1663,9 +1628,9 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                 child: const Text(
                   '완료',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -1760,7 +1725,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
                           width: 20,
                           height: 20,
                           colorFilter: const ColorFilter.mode(
-                            AppColors.error,
+                            AppColors.iconBackground,
                             BlendMode.srcIn,
                           ),
                         ),
@@ -2031,7 +1996,7 @@ class _DifficultyModal extends StatelessWidget {
                 ),
                 child: const Text(
                   '완료',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.primary),
                 ),
               ),
             ],

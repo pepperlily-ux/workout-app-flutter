@@ -119,6 +119,28 @@ class CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  // 해당 날짜의 대표 태그 계산 (가장 많은 태그, 동점이면 '종합')
+  String _getDominantTag(int day) {
+    final records = _getRecordsForDate(day);
+    if (records.isEmpty) return '';
+
+    final tagCounts = <String, int>{};
+    for (final record in records) {
+      final exercise = _getExerciseById(record.exerciseId);
+      if (exercise != null && exercise.tag.isNotEmpty) {
+        tagCounts[exercise.tag] = (tagCounts[exercise.tag] ?? 0) + 1;
+      }
+    }
+
+    if (tagCounts.isEmpty) return '종합';
+
+    final maxCount = tagCounts.values.reduce((a, b) => a > b ? a : b);
+    final topTags = tagCounts.entries.where((e) => e.value == maxCount).toList();
+
+    if (topTags.length > 1) return '종합';
+    return topTags.first.key;
+  }
+
   // 이 날짜 편집하기 버튼 클릭
   void _handleEditDate() {
     if (_selectedDay == null) return;
@@ -259,6 +281,10 @@ class CalendarPageState extends State<CalendarPage> {
                   final day = index - firstDayOfMonth + 1;
                   final hasRecords = hasWorkout(day);
                   final isSelected = _selectedDay == day;
+                  final now = DateTime.now();
+                  final isToday = _currentMonth.year == now.year &&
+                      _currentMonth.month == now.month &&
+                      day == now.day;
 
                   return GestureDetector(
                     onTap: () {
@@ -267,6 +293,7 @@ class CalendarPageState extends State<CalendarPage> {
                       });
                     },
                     child: Container(
+                      clipBehavior: Clip.hardEdge,
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primary
@@ -276,9 +303,12 @@ class CalendarPageState extends State<CalendarPage> {
                         border: Border.all(
                           color: isSelected
                               ? AppColors.primary
-                              : hasRecords
-                                  ? AppColors.primaryBorder
-                                  : AppColors.border,
+                              : isToday
+                                  ? AppColors.primary
+                                  : hasRecords
+                                      ? AppColors.primaryBorder
+                                      : AppColors.border,
+                          width: isToday && !isSelected ? 2 : 1,
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -295,10 +325,17 @@ class CalendarPageState extends State<CalendarPage> {
                             ),
                           ),
                           if (hasRecords && !isSelected) ...[
-                            const SizedBox(height: 2),
-                            const Text(
-                              '●',
-                              style: TextStyle(fontSize: 8, height: 1.0, color: AppColors.primary),
+                            const SizedBox(height: 1),
+                            Text(
+                              _getDominantTag(day),
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                height: 1.0,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ],
                         ],
@@ -432,6 +469,8 @@ class CalendarPageState extends State<CalendarPage> {
                                     const SizedBox(height: 16),
                                     const Text(
                                       '왜 운동 안하냐몽!?',
+                                      textAlign: TextAlign.center,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(fontSize: 12, color: AppColors.textHint),
                                     ),
                                   ],
@@ -498,25 +537,35 @@ class _WorkoutRecordCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
-                  borderRadius: BorderRadius.circular(4),
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.4,
                 ),
-                child: Text(
-                  tag,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEEEEE),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    tag,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             ],

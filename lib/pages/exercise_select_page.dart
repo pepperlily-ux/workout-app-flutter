@@ -22,26 +22,64 @@ class ExerciseSelectPage extends StatefulWidget {
   State<ExerciseSelectPage> createState() => _ExerciseSelectPageState();
 }
 
+const _kBookmarkTag = '__bookmark__';
+
 class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
   String _selectedTag = '전체';
   final Set<String> _selectedExerciseIds = {};
   late List<Exercise> _exercises;
+  Set<String> _bookmarks = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _exercises = widget.storage.getExercises();
+    _bookmarks = widget.storage.getBookmarks();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   List<String> get _allTags {
     final tags = _exercises.map((e) => e.tag).toSet().toList();
     tags.sort();
-    return ['전체', ...tags];
+    final hasBookmarks = _bookmarks.isNotEmpty &&
+        _exercises.any((e) => _bookmarks.contains(e.id));
+    return ['전체', if (hasBookmarks) _kBookmarkTag, ...tags];
+  }
+
+  bool get _isSearching => _searchQuery.trim().isNotEmpty;
+
+  List<Exercise> _sortByBookmark(List<Exercise> list) {
+    return List.from(list)
+      ..sort((a, b) {
+        final aB = _bookmarks.contains(a.id) ? 0 : 1;
+        final bB = _bookmarks.contains(b.id) ? 0 : 1;
+        return aB.compareTo(bB);
+      });
   }
 
   List<Exercise> get _filteredExercises {
-    if (_selectedTag == '전체') return _exercises;
-    return _exercises.where((e) => e.tag == _selectedTag).toList();
+    if (_isSearching) {
+      final q = _searchQuery.trim().toLowerCase();
+      final results = _exercises.where((e) => e.name.toLowerCase().contains(q)).toList();
+      return _sortByBookmark(results);
+    }
+    if (_selectedTag == _kBookmarkTag) {
+      return _sortByBookmark(_exercises.where((e) => _bookmarks.contains(e.id)).toList());
+    }
+    if (_selectedTag == '전체') return _sortByBookmark(List.from(_exercises));
+    return _sortByBookmark(_exercises.where((e) => e.tag == _selectedTag).toList());
   }
 
   int _getRecordCount(String exerciseId) {
@@ -126,9 +164,11 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: nameController,
+                maxLength: 20,
                 decoration: InputDecoration(
                   hintText: '예: 벤치프레스',
                   hintStyle: const TextStyle(color: AppColors.textHint),
+                  counterText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: AppColors.border),
@@ -163,9 +203,11 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
               // 운동 종류 직접 입력
               TextField(
                 controller: tagController,
+                maxLength: 10,
                 decoration: InputDecoration(
                   hintText: '예: 가슴, 등, 하체...',
                   hintStyle: const TextStyle(color: AppColors.textHint),
+                  counterText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: AppColors.border),
@@ -348,58 +390,104 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 태그 필터
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _allTags.length,
-                      itemBuilder: (context, index) {
-                        final tag = _allTags[index];
-                        final isSelected = _selectedTag == tag;
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedTag = tag;
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.border,
+                  // 검색 인풋
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: '운동 이름으로 검색',
+                      hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+                      prefixIcon: const Icon(Icons.search, color: AppColors.textHint, size: 20),
+                      suffixIcon: _isSearching
+                          ? GestureDetector(
+                              onTap: () => _searchController.clear(),
+                              child: const Icon(Icons.close, color: AppColors.textHint, size: 20),
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: AppColors.backgroundLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // 태그 필터 (검색 중이면 숨김)
+                  if (!_isSearching) ...[
+                    SizedBox(
+                      height: 40,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _allTags.length,
+                        itemBuilder: (context, index) {
+                          final tag = _allTags[index];
+                          final isSelected = _selectedTag == tag;
+
+                          if (tag == _kBookmarkTag) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedTag = tag),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? AppColors.primary : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.primary : AppColors.border,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.bookmark,
+                                      size: 16,
+                                      color: isSelected ? Colors.white : AppColors.textTertiary,
+                                    ),
                                   ),
                                 ),
-                                child: Text(
-                                  tag,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.0,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : AppColors.textTertiary,
+                              ),
+                            );
+                          }
+
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: GestureDetector(
+                                onTap: () => setState(() => _selectedTag = tag),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? AppColors.primary : Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isSelected ? AppColors.primary : AppColors.border,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      height: 1.0,
+                                      color: isSelected ? Colors.white : AppColors.textTertiary,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
+                  ] else
+                    const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -411,20 +499,21 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Image.asset(
-                            'assets/Baby.png',
-                            width: 160,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Icon(
-                                  Icons.fitness_center,
-                                  size: 48,
-                                  color: Colors.grey[300],
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            '운동이 없습니다몽',
-                            style: TextStyle(
+                          if (!_isSearching)
+                            Image.asset(
+                              'assets/Baby.png',
+                              width: 200,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(
+                                    Icons.fitness_center,
+                                    size: 48,
+                                    color: Colors.grey[300],
+                                  ),
+                            ),
+                          if (!_isSearching) const SizedBox(height: 16),
+                          Text(
+                            _isSearching ? '찾으시는 운동이 없습니다' : '운동이 없습니다몽',
+                            style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.textHint,
                             ),
@@ -439,6 +528,8 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                         final exercise = _filteredExercises[index];
                         final recordCount = _getRecordCount(exercise.id);
                         final isSelected = _selectedExerciseIds.contains(exercise.id);
+
+                        final isBookmarked = _bookmarks.contains(exercise.id);
 
                         return GestureDetector(
                           onTap: () => _toggleExercise(exercise.id),
@@ -470,53 +561,68 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                                       : null,
                                 ),
                                 const SizedBox(width: 12),
+                                // 운동 정보
                                 Expanded(
-                                  child: Row(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // 운동 이름
-                                      Flexible(
-                                        child: Text(
-                                          exercise.name,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.textPrimary,
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              exercise.name,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w500,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                          if (recordCount > 0) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 3,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                '$recordCount회',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  height: 1.0,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                      const SizedBox(width: 8),
-                                      // 태그
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          exercise.tag,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            height: 1.0,
-                                            color: AppColors.primary,
-                                          ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        exercise.tag,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textHint,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                // 기록 횟수
-                                if (recordCount > 0)
-                                  Text(
-                                    '$recordCount회',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textHint,
-                                    ),
+                                // 북마크 아이콘 (읽기전용)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Icon(
+                                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                                    size: 22,
+                                    color: isBookmarked ? AppColors.primary : AppColors.border,
                                   ),
+                                ),
                               ],
                             ),
                           ),

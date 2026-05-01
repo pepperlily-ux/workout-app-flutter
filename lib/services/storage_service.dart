@@ -14,6 +14,8 @@ class StorageService {
   static const String _dailyMemosKey = 'workout_daily_memos';
   static const String _profileCharacterKey = 'profile_character';
   static const String _profileColorKey = 'profile_color';
+  static const String _profileNameKey = 'profile_name';
+  static const String _bookmarksKey = 'exercise_bookmarks';
 
   // 싱글톤 패턴 (앱 전체에서 하나의 인스턴스만 사용)
   static final StorageService _instance = StorageService._internal();
@@ -206,6 +208,46 @@ class StorageService {
     await _prefs?.setInt(_profileColorKey, color);
   }
 
+  String getProfileName() {
+    return _prefs?.getString(_profileNameKey) ?? '헬스몽';
+  }
+
+  Future<void> saveProfileName(String name) async {
+    final trimmedName = name.trim();
+    await _prefs?.setString(
+      _profileNameKey,
+      trimmedName.isEmpty ? '헬스몽' : trimmedName,
+    );
+  }
+
+  // === 북마크 ===
+
+  Set<String> getBookmarks() {
+    final String? data = _prefs?.getString(_bookmarksKey);
+    if (data == null) return {};
+    try {
+      final List<dynamic> jsonList = jsonDecode(data);
+      return jsonList.cast<String>().toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> saveBookmarks(Set<String> bookmarks) async {
+    final String data = jsonEncode(bookmarks.toList());
+    await _prefs?.setString(_bookmarksKey, data);
+  }
+
+  Future<void> toggleBookmark(String exerciseId) async {
+    final bookmarks = getBookmarks();
+    if (bookmarks.contains(exerciseId)) {
+      bookmarks.remove(exerciseId);
+    } else {
+      bookmarks.add(exerciseId);
+    }
+    await saveBookmarks(bookmarks);
+  }
+
   // === 데이터 내보내기/가져오기 ===
 
   // 모든 데이터를 JSON 문자열로 내보내기
@@ -229,7 +271,9 @@ class StorageService {
       int exerciseCount = 0;
       if (data['exercises'] != null) {
         final exercisesList = data['exercises'] as List;
-        final exercises = exercisesList.map((e) => Exercise.fromJson(e)).toList();
+        final exercises = exercisesList
+            .map((e) => Exercise.fromJson(e))
+            .toList();
         await saveExercises(exercises);
         exerciseCount = exercises.length;
       }
