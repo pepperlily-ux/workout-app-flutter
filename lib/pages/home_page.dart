@@ -265,6 +265,16 @@ class _HomePageState extends State<HomePage> {
       record.sets.removeLast();
       await _storage.updateRecord(record);
       setState(() {
+        if (_activeRecordId == record.id &&
+            _activeSetIndex != null &&
+            _activeSetIndex! >= record.sets.length) {
+          _isKeyboardVisible = false;
+          _activeRecordId = null;
+          _activeSetIndex = null;
+          _activeField = null;
+          _currentValue = '';
+          _removeKeyboardOverlay();
+        }
         _loadDateRecords();
       });
     }
@@ -835,6 +845,11 @@ class _HomePageState extends State<HomePage> {
     if (recordIndex == -1) return;
 
     final record = dateRecords[recordIndex];
+
+    if (_activeSetIndex! >= record.sets.length) {
+      _hideKeyboard();
+      return;
+    }
 
     if (_activeField == 'weight') {
       // 무게 -> 횟수로 이동
