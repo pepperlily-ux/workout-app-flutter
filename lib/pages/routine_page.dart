@@ -12,10 +12,10 @@ class RoutinePage extends StatefulWidget {
   const RoutinePage({super.key});
 
   @override
-  State<RoutinePage> createState() => _RoutinePageState();
+  State<RoutinePage> createState() => RoutinePageState();
 }
 
-class _RoutinePageState extends State<RoutinePage> {
+class RoutinePageState extends State<RoutinePage> {
   final StorageService _storage = StorageService();
   List<Routine> _routines = [];
   List<Exercise> _exercises = [];
@@ -25,6 +25,8 @@ class _RoutinePageState extends State<RoutinePage> {
     super.initState();
     _loadData();
   }
+
+  void reload() => _loadData();
 
   Future<void> _loadData() async {
     await _storage.init();
@@ -453,7 +455,7 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                                   child: Icon(
                                     Icons.bookmark_border,
                                     size: 16,
-                                    color: isSelected ? Colors.white : AppColors.textTertiary,
+                                    color: isSelected ? Colors.white : AppColors.textHint,
                                   ),
                                 ),
                               ),
@@ -570,14 +572,15 @@ class _CreateRoutineModalState extends State<_CreateRoutineModal> {
                                 ],
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 12),
-                              child: Icon(
-                                isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                                size: 22,
-                                color: isBookmarked ? AppColors.primary : AppColors.border,
+                            if (isBookmarked)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 12),
+                                child: Icon(
+                                  Icons.bookmark,
+                                  size: 22,
+                                  color: AppColors.primary,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -940,15 +943,6 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
                                   ),
                                 ),
                               ),
-                              // 북마크 아이콘 (읽기전용)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8),
-                                child: Icon(
-                                  _bookmarks.contains(id) ? Icons.bookmark : Icons.bookmark_border,
-                                  size: 20,
-                                  color: _bookmarks.contains(id) ? AppColors.primary : AppColors.border,
-                                ),
-                              ),
                             ],
                           ),
                         );
@@ -1099,14 +1093,15 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
                                   ],
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12),
-                                child: Icon(
-                                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                                  size: 22,
-                                  color: isBookmarked ? AppColors.primary : AppColors.border,
+                              if (isBookmarked)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 12),
+                                  child: Icon(
+                                    Icons.bookmark,
+                                    size: 22,
+                                    color: AppColors.primary,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ),

@@ -178,12 +178,21 @@ class ExercisePageState extends State<ExercisePage> {
                         );
                         return;
                       }
+                      final inputName = nameController.text.trim();
+                      final isDuplicate = _exercises.any(
+                        (e) => e.name == inputName,
+                      );
+                      if (isDuplicate) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('이미 존재하는 운동 이름입니다')),
+                        );
+                        return;
+                      }
                       final exercise = Exercise(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        name: nameController.text.trim(),
+                        name: inputName,
                         tag: tagController.text.trim(),
                       );
-                      final addedName = nameController.text.trim();
                       await _storage.addExercise(exercise);
                       setState(() {
                         _exercises = _storage.getExercises();
@@ -191,7 +200,7 @@ class ExercisePageState extends State<ExercisePage> {
                       if (context.mounted) {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('$addedName 추가됨')),
+                          SnackBar(content: Text('$inputName 추가됨')),
                         );
                       }
                     },
@@ -366,54 +375,33 @@ class ExercisePageState extends State<ExercisePage> {
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            exercise.tag,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.0,
-                              color: AppColors.primary,
+                  Flexible(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(modalContext);
+                        _showEditExerciseModal(exercise);
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              exercise.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // 편집 아이콘 - LucideIcons.pencil
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(modalContext);
-                      _showEditExerciseModal(exercise);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        LucideIcons.pencil,
-                        size: 20,
-                        color: AppColors.textTertiary,
+                          const SizedBox(width: 6),
+                          const Icon(
+                            LucideIcons.pencil,
+                            size: 16,
+                            color: AppColors.textTertiary,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -827,7 +815,7 @@ class ExercisePageState extends State<ExercisePage> {
                 ),
                 child: const Center(
                   child: Text(
-                    '+ 새 운동 추가',
+                    '+ 새 운동 만들기',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -871,7 +859,7 @@ class ExercisePageState extends State<ExercisePage> {
                             child: Icon(
                               Icons.bookmark_border,
                               size: 16,
-                              color: isSelected ? Colors.white : AppColors.textTertiary,
+                              color: isSelected ? Colors.white : AppColors.textHint,
                             ),
                           ),
                         ),

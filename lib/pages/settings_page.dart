@@ -51,7 +51,7 @@ class SettingsPage extends StatelessWidget {
           ),
           _SettingsItem(label: '데이터 관리', onTap: () => _showDataModal(context)),
           _SettingsItem(
-            label: '카카오 채팅 문의',
+            label: '카카오톡 채팅 문의',
             onTap: () =>
                 _launchUrl(context, 'https://open.kakao.com/me/healthmong'),
           ),
@@ -294,9 +294,9 @@ class _DataManagementModal extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
-              '헬스몽 과부하는 사용자 데이터를 저장하지 않습니다.\n핸드폰 기기 변경시 반드시 안전하게 데이터를 저장해주세요.',
+              '헬스몽 과부하는 사용자 데이터를 저장하지 않습니다.핸드폰 기기 변경시 반드시 안전하게 데이터를 저장해주세요.',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 color: AppColors.textSecondary,
                 height: 1.5,
               ),

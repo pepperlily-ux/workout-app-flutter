@@ -862,7 +862,7 @@ class AnalysisPageState extends State<AnalysisPage> {
       {
         'title': '성장률 최고',
         'value': bestGrowth != null
-            ? '${bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%'
+            ? '${(bestGrowth['name'] as String).length > 10 ? '${(bestGrowth['name'] as String).substring(0, 10)}...' : bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%'
             : '없음 +0.0%',
         'icon': LucideIcons.trophy,
       },

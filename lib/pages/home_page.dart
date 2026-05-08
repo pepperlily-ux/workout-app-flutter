@@ -1653,7 +1653,7 @@ class _OrderChangeModalState extends State<_OrderChangeModal> {
           ),
           const SizedBox(height: 8),
           const Text(
-            '드래그해서 순서를 변경하세요',
+            '드래그해서 순서를 변경하거나, 운동을 리스트에서 삭제 할 수 있습니다.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textTertiary,

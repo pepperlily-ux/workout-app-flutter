@@ -140,13 +140,47 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                     '운동 추가',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pop(modalContext),
-                    child: const Icon(Icons.close, color: AppColors.textTertiary),
+                    onTap: () async {
+                      if (nameController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('운동 이름을 입력하세요')),
+                        );
+                        return;
+                      }
+                      if (tagController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('운동 종류를 입력하세요')),
+                        );
+                        return;
+                      }
+
+                      final name = nameController.text.trim();
+                      final tag = tagController.text.trim();
+                      Navigator.pop(modalContext);
+                      await widget.onAddNew(name, tag);
+                      if (mounted) {
+                        setState(() {
+                          _exercises = widget.storage.getExercises();
+                          final newExercise = _exercises.where((e) => e.name == name && e.tag == tag).lastOrNull;
+                          if (newExercise != null) {
+                            _selectedExerciseIds.add(newExercise.id);
+                          }
+                        });
+                      }
+                    },
+                    child: const Text(
+                      '저장',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -285,57 +319,6 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                   );
                 },
               ),
-              const SizedBox(height: 24),
-
-              // 추가 버튼
-              GestureDetector(
-                onTap: () async {
-                  if (nameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('운동 이름을 입력하세요')),
-                    );
-                    return;
-                  }
-                  if (tagController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('운동 종류를 입력하세요')),
-                    );
-                    return;
-                  }
-
-                  final name = nameController.text.trim();
-                  final tag = tagController.text.trim();
-                  Navigator.pop(modalContext);
-                  await widget.onAddNew(name, tag);
-                  if (mounted) {
-                    setState(() {
-                      _exercises = widget.storage.getExercises();
-                      final newExercise = _exercises.where((e) => e.name == name && e.tag == tag).lastOrNull;
-                      if (newExercise != null) {
-                        _selectedExerciseIds.add(newExercise.id);
-                      }
-                    });
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '추가',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -445,7 +428,7 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                                     child: Icon(
                                       Icons.bookmark_border,
                                       size: 16,
-                                      color: isSelected ? Colors.white : AppColors.textTertiary,
+                                      color: isSelected ? Colors.white : AppColors.textHint,
                                     ),
                                   ),
                                 ),
@@ -614,15 +597,15 @@ class _ExerciseSelectPageState extends State<ExerciseSelectPage> {
                                     ],
                                   ),
                                 ),
-                                // 북마크 아이콘 (읽기전용)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 12),
-                                  child: Icon(
-                                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                                    size: 22,
-                                    color: isBookmarked ? AppColors.primary : AppColors.border,
+                                if (isBookmarked)
+                                  const Padding(
+                                    padding: EdgeInsets.only(left: 12),
+                                    child: Icon(
+                                      Icons.bookmark,
+                                      size: 22,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),

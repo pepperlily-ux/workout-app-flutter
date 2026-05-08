@@ -6,7 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'pages/home_page.dart';
 import 'pages/calendar_page.dart' show CalendarPage, CalendarPageState;
 import 'pages/analysis_page.dart' show AnalysisPage, AnalysisPageState;
-import 'pages/routine_page.dart';
+import 'pages/routine_page.dart' show RoutinePage, RoutinePageState;
 import 'pages/exercise_page.dart' show ExercisePage, ExercisePageState;
 import 'pages/splash_page.dart';
 import 'constants/app_colors.dart';
@@ -89,6 +89,7 @@ class _MainScreenState extends State<MainScreen> {
   String? _selectedDate;
   final _calendarKey = GlobalKey<CalendarPageState>();
   final _analysisKey = GlobalKey<AnalysisPageState>();
+  final _routineKey = GlobalKey<RoutinePageState>();
   final _exerciseKey = GlobalKey<ExercisePageState>();
 
   // 캘린더에서 날짜 선택 시 홈으로 이동
@@ -113,7 +114,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       CalendarPage(key: _calendarKey, onDateSelect: _onCalendarDateSelect),
       AnalysisPage(key: _analysisKey),
-      const RoutinePage(),
+      RoutinePage(key: _routineKey),
       ExercisePage(key: _exerciseKey),
     ];
 
@@ -161,6 +162,7 @@ class _MainScreenState extends State<MainScreen> {
             }
             if (index == 1) _calendarKey.currentState?.reload();
             if (index == 2) _analysisKey.currentState?.reload();
+            if (index == 3) _routineKey.currentState?.reload();
             if (index == 4) _exerciseKey.currentState?.reload();
             _currentIndex = index;
           });
