@@ -462,7 +462,7 @@ class CalendarPageState extends State<CalendarPage> {
                                   children: [
                                     Image.asset(
                                       'assets/Sad.png',
-                                      width: 160,
+                                      width: 130,
                                       errorBuilder: (context, error, stackTrace) =>
                                           const SizedBox(height: 100),
                                     ),
@@ -471,7 +471,7 @@ class CalendarPageState extends State<CalendarPage> {
                                       '왜 운동 안하냐몽!?',
                                       textAlign: TextAlign.center,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                                      style: TextStyle(fontSize: 14, color: AppColors.textHint),
                                     ),
                                   ],
                                 ),

@@ -5,6 +5,7 @@ import '../constants/metamon_messages.dart';
 import '../services/storage_service.dart';
 import '../models/record.dart';
 import '../models/exercise.dart';
+import 'settings_page.dart';
 
 // 프로필 캐릭터 정의
 const _profileCharacters = [
@@ -648,7 +649,12 @@ class AnalysisPageState extends State<AnalysisPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsPage()),
+                      );
+                    },
                     icon: const Icon(LucideIcons.settings),
                     iconSize: 20,
                     color: AppColors.textTertiary,
@@ -811,13 +817,19 @@ class AnalysisPageState extends State<AnalysisPage> {
     final overallGrowth = _getOverallGrowthRate();
 
     if (workoutDays == 0) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        child: const Center(
-          child: Text(
-            '이 달의 운동 기록이 없습니다',
-            style: TextStyle(fontSize: 14, color: AppColors.textHint),
-          ),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 32),
+            Image.asset('assets/Sad.png', width: 200),
+            const SizedBox(height: 16),
+            const Text(
+              '이 달의 운동 기록이 없습니다',
+              style: TextStyle(fontSize: 14, color: AppColors.textHint),
+            ),
+            const SizedBox(height: 32),
+          ],
         ),
       );
     }
@@ -839,7 +851,7 @@ class AnalysisPageState extends State<AnalysisPage> {
         'icon': LucideIcons.lineChart,
       },
       {
-        'title': '전체 성장률',
+        'title': '전달 대비 성장률',
         'value': overallGrowth ?? '+0.0%',
         'icon': LucideIcons.trendingUp,
       },
