@@ -5,7 +5,6 @@ import '../constants/metamon_messages.dart';
 import '../services/storage_service.dart';
 import '../models/record.dart';
 import '../models/exercise.dart';
-import 'settings_page.dart';
 
 // 프로필 캐릭터 정의
 const _profileCharacters = [
@@ -649,12 +648,7 @@ class AnalysisPageState extends State<AnalysisPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SettingsPage()),
-                      );
-                    },
+                    onPressed: () {},
                     icon: const Icon(LucideIcons.settings),
                     iconSize: 20,
                     color: AppColors.textTertiary,
@@ -862,7 +856,7 @@ class AnalysisPageState extends State<AnalysisPage> {
       {
         'title': '성장률 최고',
         'value': bestGrowth != null
-            ? '${(bestGrowth['name'] as String).length > 10 ? '${(bestGrowth['name'] as String).substring(0, 10)}...' : bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%'
+            ? '${bestGrowth['name']} +${(bestGrowth['growth'] as double).toStringAsFixed(1)}%'
             : '없음 +0.0%',
         'icon': LucideIcons.trophy,
       },
@@ -896,7 +890,6 @@ class AnalysisPageState extends State<AnalysisPage> {
   Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(16),
-      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
@@ -904,6 +897,7 @@ class AnalysisPageState extends State<AnalysisPage> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
@@ -917,16 +911,14 @@ class AnalysisPageState extends State<AnalysisPage> {
                     color: AppColors.textTertiary,
                   ),
                   overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
               ),
             ],
           ),
-          const Spacer(),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),

@@ -170,6 +170,38 @@ class _DataManagementModal extends StatelessWidget {
     }
   }
 
+  Future<void> _deleteAllData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('데이터 삭제'),
+        content: const Text('모든 운동 기록, 루틴, 북마크가 삭제됩니다.\n삭제 후 복구할 수 없습니다.\n\n계속하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소', style: TextStyle(color: AppColors.textTertiary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final storage = StorageService();
+    await storage.deleteAllData();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('모든 데이터가 삭제되었습니다')),
+      );
+    }
+  }
+
   Future<void> _importData(BuildContext context) async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -348,6 +380,32 @@ class _DataManagementModal extends StatelessWidget {
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+              _deleteAllData(parentContext);
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: const Center(
+                child: Text(
+                  '데이터 삭제',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
                   ),
                 ),
               ),

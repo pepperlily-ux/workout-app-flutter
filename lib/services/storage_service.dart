@@ -262,6 +262,15 @@ class StorageService {
     return jsonEncode(data);
   }
 
+  Future<void> deleteAllData() async {
+    await _prefs?.remove(_exercisesKey);
+    await _prefs?.remove(_recordsKey);
+    await _prefs?.remove(_routinesKey);
+    await _prefs?.remove(_checkedSetsKey);
+    await _prefs?.remove(_dailyMemosKey);
+    await _prefs?.remove(_bookmarksKey);
+  }
+
   // JSON 문자열에서 데이터 가져오기
   Future<Map<String, int>> importAllData(String jsonString) async {
     try {
