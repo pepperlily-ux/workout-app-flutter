@@ -142,9 +142,12 @@ class StorageService {
   Map<String, bool> getCheckedSets() {
     final String? data = _prefs?.getString(_checkedSetsKey);
     if (data == null) return {};
-
-    final Map<String, dynamic> jsonMap = jsonDecode(data);
-    return jsonMap.map((key, value) => MapEntry(key, value as bool));
+    try {
+      final Map<String, dynamic> jsonMap = jsonDecode(data);
+      return jsonMap.map((key, value) => MapEntry(key, value as bool));
+    } catch (_) {
+      return {};
+    }
   }
 
   // 체크된 세트 저장
@@ -167,9 +170,12 @@ class StorageService {
   Map<String, String> getDailyMemos() {
     final String? data = _prefs?.getString(_dailyMemosKey);
     if (data == null) return {};
-
-    final Map<String, dynamic> jsonMap = jsonDecode(data);
-    return jsonMap.map((key, value) => MapEntry(key, value as String));
+    try {
+      final Map<String, dynamic> jsonMap = jsonDecode(data);
+      return jsonMap.map((key, value) => MapEntry(key, value as String));
+    } catch (_) {
+      return {};
+    }
   }
 
   // 특정 날짜의 메모 가져오기

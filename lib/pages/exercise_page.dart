@@ -56,11 +56,12 @@ class ExercisePageState extends State<ExercisePage> {
       list = _exercises.where((e) => e.tag == _selectedTag).toList();
     }
     // 북마크 상단 고정, 이후 운동 횟수 내림차순, 동일 횟수는 추가 순서 유지
+    final countCache = {for (final e in list) e.id: _getRecordCount(e.id)};
     list.sort((a, b) {
       final aB = _bookmarks.contains(a.id) ? 0 : 1;
       final bB = _bookmarks.contains(b.id) ? 0 : 1;
       if (aB != bB) return aB.compareTo(bB);
-      return _getRecordCount(b.id).compareTo(_getRecordCount(a.id));
+      return (countCache[b.id] ?? 0).compareTo(countCache[a.id] ?? 0);
     });
     return list;
   }
