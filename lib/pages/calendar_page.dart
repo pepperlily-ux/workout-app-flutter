@@ -452,7 +452,7 @@ class CalendarPageState extends State<CalendarPage> {
                       ] else ...[
                         // 운동 기록 없음
                         SizedBox(
-                          height: 270,
+                          height: 240,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
